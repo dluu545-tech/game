@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Todo App</title>
+    <!-- Tailwind CSS qua CDN để giao diện đẹp mà không cần cài đặt -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .todo-item {
+            transition: all 0.2s ease;
+        }
+
+        .todo-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        /* Tùy chỉnh thanh cuộn cho desktop */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-2">My Tasks</h1>
+            <p class="text-slate-500">Quản lý công việc hiệu quả trên mọi thiết bị</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm mb-6 flex flex-col sm:flex-row gap-3">
+            <input type="text" id="taskInput" 
+                   placeholder="Thêm công việc mới..." 
+                   class="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700">
+            <button onclick="addTask()" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
+                <i class="fas fa-plus"></i> Thêm
+            </button>
+        </div>
+
+        <!-- Filter & Stats -->
+        <div class="flex items-center justify-between mb-6 px-2 text-sm text-slate-500 font-medium">
+            <span id="taskCount">0 công việc</span>
+            <button onclick="clearAll()" class="hover:text-red-500 transition-colors">Xóa tất cả</button>
+        </div>
+
+        <!-- Task List -->
+        <div id="taskList" class="space-y-3">
+            <!-- Tasks will be rendered here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-20">
+            <div class="text-slate-300 mb-4">
+                <i class="fas fa-clipboard-list text-6xl"></i>
+            </div>
+            <p class="text-slate-500 italic">Chưa có công việc nào. Hãy bắt đầu ngay!</p>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+        // Elements
+        const taskInput = document.getElementById('taskInput');
+        const taskList = document.getElementById('taskList');
+        const taskCount = document.getElementById('taskCount');
+        const emptyState = document.getElementById('emptyState');
+
+        // Khởi tạo ứng dụng
+        window.onload = () => {
+            renderTasks();
+            
+            // Xử lý phím Enter
+            taskInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addTask();
+            });
+        };
+
+        // Lưu vào LocalStorage
+        function saveTasks() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            renderTasks();
+        }
+
+        // Thêm công việc
+        function addTask() {
+            const text = taskInput.value.trim();
+            if (!text) return;
+
+            const newTask = {
+                id: Date.now(),
+                text: text,
+                completed: false,
+                createdAt: new Date().toLocaleDateString('vi-VN')
+            };
+
+            tasks.unshift(newTask); // Thêm vào đầu danh sách
+            taskInput.value = '';
+            saveTasks();
+        }
+
+        // Xóa công việc
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            saveTasks();
+        }
+
+        // Đánh dấu hoàn thành
+        function toggleTask(id) {
+            tasks = tasks.map(t => {
+                if (t.id === id) return { ...t, completed: !t.completed };
+                return t;
+            });
+            saveTasks();
+        }
+
+        // Xóa sạch danh sách
+        function clearAll() {
+            if (confirm('Bạn có chắc chắn muốn xóa tất cả công việc?')) {
+                tasks = [];
+                saveTasks();
+            }
+        }
+
+        // Hiển thị danh sách
+        function renderTasks() {
+            taskList.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                emptyState.classList.remove('hidden');
+                taskCount.innerText = `0 công việc`;
+            } else {
+                emptyState.classList.add('hidden');
+                taskCount.innerText = `${tasks.length} công việc`;
+
+                tasks.forEach(task => {
+                    const div = document.createElement('div');
+                    div.className = `todo-item bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-4 transition-all ${task.completed ? 'opacity-60' : ''}`;
+                    
+                    div.innerHTML = `
+                        <button onclick="toggleTask(${task.id})" class="text-xl ${task.completed ? 'text-green-500' : 'text-slate-300 hover:text-blue-500'}">
+                            <i class="${task.completed ? 'fas fa-check-circle' : 'far fa-circle'}"></i>
+                        </button>
+                        <div class="flex-1">
+                            <p class="text-slate-800 font-medium ${task.completed ? 'line-through' : ''}">${task.text}</p>
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">${task.createdAt}</span>
+                        </div>
+                        <button onclick="deleteTask(${task.id})" class="text-slate-300 hover:text-red-500 transition-colors p-2">
+                            <i class="far fa-trash-alt"></i>
+                        </button>
+                    `;
+                    taskList.appendChild(div);
+                });
+            }
+        }
+    </script>
+</body>
+</html>
