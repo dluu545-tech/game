@@ -196,68 +196,18 @@
         let timerInterval = null;
         let studentList = [];
 
-        // KHỞI TẠO AUTH TRƯỚC
-        window.onload = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-            }
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUser = user;
-                    // CHỈ GỌI LISTENERS SAU KHI ĐÃ ĐĂNG NHẬP THÀNH CÔNG
-                    setupListeners();
-                }
-            });
-        };
-
-        function setupListeners() {
-            if (!currentUser) return;
-
-            // Lắng nghe câu hỏi
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), (snap) => {
-                questions = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.createdAt - b.createdAt);
-                renderQuestionsList();
-                document.getElementById('totalQ').innerText = questions.length;
-            }, (err) => console.error("Questions listener error:", err));
-
-            // Lắng nghe cài đặt
-            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'general'), (snap) => {
-                if(snap.exists()) {
-                    roomSettings = snap.data();
-                    const codeEl = document.getElementById('roomCode');
-                    const timeEl = document.getElementById('roomTime');
-                    if(codeEl) codeEl.value = roomSettings.code || '123456';
-                    if(timeEl) timeEl.value = roomSettings.duration || 15;
-                }
-            }, (err) => console.error("Settings listener error:", err));
-
-            // Lắng nghe danh sách học sinh
-            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'students', 'list'), (snap) => {
-                if(snap.exists()) {
-                    studentList = snap.data().data || [];
-                    renderStudentTable();
-                    renderStudentDropdown();
-                }
-            }, (err) => console.error("Students listener error:", err));
-
-            // Lắng nghe kết quả
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'results'), (snap) => {
-                renderResultsTable(snap.docs.map(d => ({id: d.id, ...d.data()})));
-            }, (err) => console.error("Results listener error:", err));
-        }
-
-        // --- CÁC HÀM XỬ LÝ GIAO DIỆN (GIỮ NGUYÊN) ---
+        // --- GÁN CÁC HÀM VÀO WINDOW ĐỂ HOẠT ĐỘNG TRONG MODULE ---
         window.changeView = (role) => {
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active', 'text-slate-500'));
-            const tab = document.getElementById(`tab-${role}`);
-            if(tab) tab.classList.add('active');
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.classList.add('text-slate-500');
+            });
+            const activeTab = document.getElementById(`tab-${role}`);
+            if(activeTab) {
+                activeTab.classList.add('active');
+                activeTab.classList.remove('text-slate-500');
+            }
             document.getElementById('teacherView').classList.toggle('hidden', role !== 'teacher');
             document.getElementById('studentView').classList.toggle('hidden', role !== 'student');
         };
@@ -291,20 +241,6 @@
             document.getElementById('qText').value = "";
         };
 
-        function renderQuestionsList() {
-            const list = document.getElementById('questionsList');
-            if(!list) return;
-            list.innerHTML = questions.map((q, i) => `
-                <div class="canva-card p-4 flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-indigo-600">#${i+1}</span>
-                        <span class="text-sm font-medium">${q.text}</span>
-                    </div>
-                    <button onclick="deleteQuestion('${q.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
-                </div>
-            `).join('');
-        }
-
         window.deleteQuestion = async (id) => {
             if(!currentUser) return;
             await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questions', id));
@@ -318,6 +254,110 @@
             });
             alert("Đã lưu cài đặt!");
         };
+
+        window.selectAnswer = (idx) => {
+            studentAnswers[curQIdx].answer = idx;
+            renderQuizPage();
+        };
+
+        window.nextQuestion = () => {
+            if(curQIdx < questions.length - 1) {
+                curQIdx++;
+                renderQuizPage();
+            } else {
+                if(confirm("Nộp bài?")) submitQuiz();
+            }
+        };
+
+        window.prevQuestion = () => { if(curQIdx > 0) { curQIdx--; renderQuizPage(); } };
+
+        window.enterExam = () => {
+            const name = document.getElementById('stList').value || document.getElementById('stName').value;
+            if(!name) return alert("Vui lòng chọn hoặc nhập tên!");
+            if(questions.length === 0) return alert("Chưa có đề thi!");
+
+            document.getElementById('st-login').classList.add('hidden');
+            document.getElementById('st-exam').classList.remove('hidden');
+            studentAnswers = questions.map(q => ({qid: q.id, answer: q.type === 'essay' ? "" : null}));
+            
+            let time = roomSettings.duration * 60;
+            timerInterval = setInterval(() => {
+                time--;
+                let m = Math.floor(time / 60);
+                let s = time % 60;
+                const display = document.getElementById('stTimer');
+                if(display) display.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if(time <= 0) submitQuiz();
+            }, 1000);
+            renderQuizPage();
+        };
+
+        // KHỞI TẠO AUTH
+        window.onload = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    setupListeners();
+                }
+            });
+        };
+
+        function setupListeners() {
+            if (!currentUser) return;
+
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), (snap) => {
+                questions = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.createdAt - b.createdAt);
+                renderQuestionsList();
+                const totalQ = document.getElementById('totalQ');
+                if(totalQ) totalQ.innerText = questions.length;
+            });
+
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'general'), (snap) => {
+                if(snap.exists()) {
+                    roomSettings = snap.data();
+                    const codeEl = document.getElementById('roomCode');
+                    const timeEl = document.getElementById('roomTime');
+                    if(codeEl) codeEl.value = roomSettings.code || '123456';
+                    if(timeEl) timeEl.value = roomSettings.duration || 15;
+                }
+            });
+
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'students', 'list'), (snap) => {
+                if(snap.exists()) {
+                    studentList = snap.data().data || [];
+                    renderStudentTable();
+                    renderStudentDropdown();
+                }
+            });
+
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'results'), (snap) => {
+                renderResultsTable(snap.docs.map(d => ({id: d.id, ...d.data()})));
+            });
+        }
+
+        function renderQuestionsList() {
+            const list = document.getElementById('questionsList');
+            if(!list) return;
+            list.innerHTML = questions.map((q, i) => `
+                <div class="canva-card p-4 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-indigo-600">#${i+1}</span>
+                        <span class="text-sm font-medium">${q.text}</span>
+                    </div>
+                    <button onclick="deleteQuestion('${q.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
 
         const excelFile = document.getElementById('excelFile');
         if(excelFile) {
@@ -384,27 +424,6 @@
             }
         }
 
-        window.enterExam = () => {
-            const name = document.getElementById('stList').value || document.getElementById('stName').value;
-            if(!name) return alert("Vui lòng chọn hoặc nhập tên!");
-            if(questions.length === 0) return alert("Chưa có đề thi!");
-
-            document.getElementById('st-login').classList.add('hidden');
-            document.getElementById('st-exam').classList.remove('hidden');
-            studentAnswers = questions.map(q => ({qid: q.id, answer: q.type === 'essay' ? "" : null}));
-            
-            let time = roomSettings.duration * 60;
-            timerInterval = setInterval(() => {
-                time--;
-                let m = Math.floor(time / 60);
-                let s = time % 60;
-                const display = document.getElementById('stTimer');
-                if(display) display.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-                if(time <= 0) submitQuiz();
-            }, 1000);
-            renderQuizPage();
-        };
-
         function renderQuizPage() {
             const q = questions[curQIdx];
             const curEl = document.getElementById('curQIdx');
@@ -429,29 +448,13 @@
                 essay.classList.remove('hidden');
                 const area = document.getElementById('stEssayAns');
                 if(area) {
-                    area.value = studentAnswers[curQIdx].answer;
+                    area.value = studentAnswers[curQIdx].answer || "";
                     area.oninput = (e) => { studentAnswers[curQIdx].answer = e.target.value; };
                 }
             }
             const nextBtn = document.getElementById('nextBtn');
             if(nextBtn) nextBtn.innerText = curQIdx === questions.length - 1 ? "NỘP BÀI" : "TIẾP THEO";
         }
-
-        window.selectAnswer = (idx) => {
-            studentAnswers[curQIdx].answer = idx;
-            renderQuizPage();
-        };
-
-        window.nextQuestion = () => {
-            if(curQIdx < questions.length - 1) {
-                curQIdx++;
-                renderQuizPage();
-            } else {
-                if(confirm("Nộp bài?")) submitQuiz();
-            }
-        };
-
-        window.prevQuestion = () => { if(curQIdx > 0) { curQIdx--; renderQuizPage(); } };
 
         async function submitQuiz() {
             if(!currentUser) return;
