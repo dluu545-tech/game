@@ -3,304 +3,617 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuizPro - Hệ thống Thi Online</title>
+    <title>QuizPro v2 - Anti-Cheat & Realtime Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-        
-        body {
-            font-family: 'Outfit', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .option-card {
-            transition: all 0.2s ease;
-            cursor: pointer;
-            border: 2px solid transparent;
-        }
-
-        .option-card:hover {
-            border-color: #667eea;
-            background-color: #f8faff;
-        }
-
-        .option-card.selected {
-            border-color: #764ba2;
-            background-color: #f3f0ff;
-            font-weight: 600;
-        }
-
-        .gradient-text {
-            background: linear-gradient(to right, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        :root { --primary: #6E41E2; --secondary: #2D31FA; --bg-light: #F8FAFC; }
+        body { font-family: 'Outfit', sans-serif; background-color: var(--bg-light); min-height: 100vh; }
+        .canva-card { background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+        .nav-tab.active { background-color: var(--primary); color: white; }
+        .btn-primary { background: linear-gradient(135deg, #6E41E2 0%, #2D31FA 100%); color: white; }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .gradient-text { background: linear-gradient(135deg, #6E41E2 0%, #2D31FA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .progress-bar { transition: width 0.3s ease; }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="text-slate-800">
 
-    <div class="max-w-4xl mx-auto">
-        <!-- Auth / Login View -->
-        <div id="authView" class="glass-card rounded-3xl p-8 shadow-2xl text-center max-w-md mx-auto mt-20">
-            <h1 class="text-4xl font-bold gradient-text mb-6">QuizPro</h1>
-            <p class="text-slate-600 mb-8">Nhập tên của bạn để bắt đầu bài thi</p>
-            <input type="text" id="userName" placeholder="Họ và tên của bạn..." 
-                   class="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4 text-center text-lg">
-            <button onclick="startApp()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:opacity-90 transition-all">
-                VÀO THI NGAY
-            </button>
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-100 px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <span class="text-2xl font-black text-slate-900 tracking-tight">QuizPro <span class="text-indigo-600">v2</span></span>
+            </div>
+            <div class="flex bg-slate-100 p-1 rounded-xl" id="roleSwitcher">
+                <button onclick="switchRole('student')" id="tab-student" class="nav-tab active px-5 py-2 rounded-lg text-sm font-bold transition-all">Học sinh</button>
+                <button onclick="switchRole('teacher')" id="tab-teacher" class="nav-tab px-5 py-2 rounded-lg text-sm font-bold transition-all">Giáo viên</button>
+            </div>
         </div>
+    </nav>
 
-        <!-- Quiz View -->
-        <div id="quizView" class="hidden glass-card rounded-3xl p-6 md:p-10 shadow-2xl">
-            <div class="flex justify-between items-center mb-8">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold" id="userInitial">A</div>
-                    <div>
-                        <p class="text-sm text-slate-500">Thí sinh</p>
-                        <p class="font-bold text-slate-800" id="displayUserName">Nguyễn Văn A</p>
+    <main class="max-w-7xl mx-auto p-4 md:p-8">
+        
+        <!-- SECTION: TEACHER VIEW -->
+        <div id="teacherView" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h1 class="text-3xl font-black text-slate-800">Quản trị viên</h1>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="showTeacherSection('quiz')" class="bg-white px-4 py-2 rounded-xl border border-slate-200 font-bold hover:bg-slate-50"><i class="fas fa-file-alt mr-2"></i>Đề thi</button>
+                    <button onclick="showTeacherSection('monitoring')" class="bg-white px-4 py-2 rounded-xl border border-slate-200 font-bold hover:bg-slate-50"><i class="fas fa-desktop mr-2 text-green-500"></i>Giám sát</button>
+                    <button onclick="showTeacherSection('analytics')" class="bg-white px-4 py-2 rounded-xl border border-slate-200 font-bold hover:bg-slate-50"><i class="fas fa-chart-pie mr-2 text-orange-500"></i>Thống kê</button>
+                </div>
+            </div>
+
+            <!-- Monitoring: Realtime Students -->
+            <div id="section-monitoring" class="hidden space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="canva-card p-6 border-l-4 border-green-500">
+                        <p class="text-slate-400 font-bold text-xs uppercase">Đang trực tuyến</p>
+                        <p id="onlineCount" class="text-4xl font-black">0</p>
+                    </div>
+                    <div class="canva-card p-6 border-l-4 border-orange-500">
+                        <p class="text-slate-400 font-bold text-xs uppercase">Đã nộp bài</p>
+                        <p id="submittedCount" class="text-4xl font-black">0</p>
+                    </div>
+                    <div class="canva-card p-6 border-l-4 border-indigo-500">
+                        <p class="text-slate-400 font-bold text-xs uppercase">Trung bình điểm</p>
+                        <p id="avgScore" class="text-4xl font-black">0.0</p>
                     </div>
                 </div>
-                <div class="text-right">
-                    <p class="text-sm text-slate-500">Câu hỏi</p>
-                    <p class="font-bold text-slate-800"><span id="currentQuestionNum">1</span> / <span id="totalQuestionsNum">10</span></p>
+                <div class="canva-card overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                            <tr>
+                                <th class="p-4">Học sinh</th>
+                                <th class="p-4">Trạng thái</th>
+                                <th class="p-4">Tiến độ</th>
+                                <th class="p-4">Cảnh báo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monitoringTable">
+                            <!-- Realtime data here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- Question Area -->
-            <div id="questionContainer" class="mb-10">
-                <h2 id="questionText" class="text-2xl font-bold text-slate-800 mb-6 leading-tight">
-                    Đang tải câu hỏi...
-                </h2>
-                <div id="optionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Options generated by JS -->
+            <!-- Quiz Management -->
+            <div id="section-quiz" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="canva-card p-6">
+                        <h2 class="text-xl font-bold mb-4">Tạo câu hỏi mới</h2>
+                        <textarea id="qText" placeholder="Nội dung câu hỏi..." class="w-full p-4 rounded-xl bg-slate-50 border-none mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <input type="text" id="opt0" placeholder="Đáp án A" class="p-3 rounded-lg bg-slate-50 border-none">
+                            <input type="text" id="opt1" placeholder="Đáp án B" class="p-3 rounded-lg bg-slate-50 border-none">
+                            <input type="text" id="opt2" placeholder="Đáp án C" class="p-3 rounded-lg bg-slate-50 border-none">
+                            <input type="text" id="opt3" placeholder="Đáp án D" class="p-3 rounded-lg bg-slate-50 border-none">
+                        </div>
+                        <div class="flex gap-4">
+                            <select id="correctOpt" class="bg-slate-50 p-3 rounded-lg border-none font-bold">
+                                <option value="0">Đúng: A</option>
+                                <option value="1">Đúng: B</option>
+                                <option value="2">Đúng: C</option>
+                                <option value="3">Đúng: D</option>
+                                <option value="essay">Tự Luận</option>
+                            </select>
+                            <button onclick="addQuestion()" class="btn-primary flex-1 py-3 rounded-xl font-bold">Thêm vào đề</button>
+                        </div>
+                    </div>
+                    <div id="questionListDisplay" class="space-y-3"></div>
+                </div>
+                <div class="canva-card p-6 space-y-4 h-fit">
+                    <h2 class="text-xl font-bold">Cài đặt phòng</h2>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Mã đề</label>
+                        <input type="text" id="roomCode" class="w-full p-3 bg-slate-50 rounded-lg font-mono font-bold text-indigo-600">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Thời gian (phút)</label>
+                        <input type="number" id="examDuration" class="w-full p-3 bg-slate-50 rounded-lg font-bold">
+                    </div>
+                    <button onclick="saveSettings()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-all">Lưu cấu hình</button>
                 </div>
             </div>
 
-            <div class="flex justify-between mt-8">
-                <button onclick="prevQuestion()" id="prevBtn" class="px-8 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-all invisible">Quay lại</button>
-                <button onclick="nextQuestion()" id="nextBtn" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all">Câu tiếp theo</button>
+            <!-- Analytics & Charts -->
+            <div id="section-analytics" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="canva-card p-6">
+                        <h2 class="text-xl font-bold mb-4">Phân phối điểm số</h2>
+                        <canvas id="scoreChart"></canvas>
+                    </div>
+                    <div class="canva-card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">Top 5 Thí sinh</h2>
+                            <button onclick="exportFullExcel()" class="text-green-600 font-bold text-sm"><i class="fas fa-download mr-1"></i> Xuất Excel Tổng</button>
+                        </div>
+                        <div id="topStudents" class="space-y-4">
+                            <!-- Top list -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Result View -->
-        <div id="resultView" class="hidden glass-card rounded-3xl p-10 shadow-2xl text-center">
-            <div class="mb-6">
-                <i class="fas fa-trophy text-yellow-400 text-7xl mb-4"></i>
-                <h2 class="text-3xl font-bold text-slate-800">Hoàn thành bài thi!</h2>
-            </div>
-            <div class="bg-slate-50 rounded-3xl p-8 mb-8">
-                <p class="text-slate-500 uppercase tracking-widest text-sm font-bold mb-2">Điểm số của bạn</p>
-                <p class="text-6xl font-black gradient-text" id="finalScore">0/10</p>
-            </div>
+        <!-- SECTION: STUDENT VIEW -->
+        <div id="studentView" class="max-w-2xl mx-auto space-y-6">
             
-            <div class="mb-8 overflow-hidden rounded-2xl border border-slate-100">
-                <table class="w-full text-left">
-                    <thead class="bg-slate-100 text-slate-600 text-xs uppercase font-bold">
-                        <tr>
-                            <th class="px-6 py-3">Hạng</th>
-                            <th class="px-6 py-3">Học sinh</th>
-                            <th class="px-6 py-3 text-right">Điểm</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboardBody" class="text-slate-700">
-                        <!-- Leaderboard data -->
-                    </tbody>
-                </table>
+            <!-- Student Login -->
+            <div id="student-login" class="canva-card p-10 text-center space-y-6">
+                <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-inner">
+                    <i class="fas fa-user-edit"></i>
+                </div>
+                <h1 class="text-4xl font-black text-slate-900">Bắt đầu bài thi</h1>
+                <div class="space-y-4 text-left">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase ml-2">Họ và tên</label>
+                        <input type="text" id="stNameInput" placeholder="VD: Nguyễn Văn A" class="w-full p-4 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase ml-2">Mã số học sinh</label>
+                        <input type="text" id="stIdInput" placeholder="VD: HS001" class="w-full p-4 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+                <button onclick="startExam()" class="w-full btn-primary py-4 rounded-2xl text-xl font-bold shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all">
+                    VÀO PHÒNG THI
+                </button>
+                <p class="text-xs text-slate-400 font-medium">Hệ thống sẽ ghi lại mọi hành vi rời trang hoặc chuyển tab.</p>
             </div>
 
-            <button onclick="location.reload()" class="bg-slate-800 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-900 transition-all">THI LẠI</button>
+            <!-- Student Exam Content -->
+            <div id="student-exam" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold" id="stAvatar">A</div>
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Đang thi</p>
+                            <p id="stDisplayName" class="font-bold text-slate-700 leading-none">---</p>
+                        </div>
+                    </div>
+                    <div class="bg-red-50 text-red-600 px-4 py-2 rounded-xl flex items-center gap-2">
+                        <i class="fas fa-hourglass-half"></i>
+                        <span id="stTimer" class="font-mono font-black text-lg">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div id="stProgressBar" class="progress-bar h-full bg-indigo-600" style="width: 0%"></div>
+                </div>
+
+                <div id="qBox" class="canva-card p-8 space-y-6">
+                    <div class="flex justify-between items-center">
+                        <span class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-500">Câu <span id="curIdxDisp">1</span>/<span id="totalIdxDisp">0</span></span>
+                        <span id="antiCheatStatus" class="text-[10px] font-bold text-green-500 uppercase flex items-center gap-1">
+                            <i class="fas fa-shield-alt"></i> Bảo mật: An toàn
+                        </span>
+                    </div>
+                    <h2 id="stQuestionText" class="text-2xl font-bold text-slate-800 leading-snug">---</h2>
+                    
+                    <div id="stOptions" class="grid gap-3"></div>
+                    <div id="stEssayArea" class="hidden">
+                        <textarea id="stEssayAnswer" placeholder="Nhập câu trả lời của bạn tại đây..." class="w-full h-40 p-4 bg-slate-50 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-between gap-4">
+                    <button onclick="prevQ()" class="px-6 py-3 font-bold text-slate-400 hover:text-slate-600">Quay lại</button>
+                    <button onclick="nextQ()" id="nextBtn" class="btn-primary flex-1 py-4 rounded-2xl font-bold shadow-lg">Câu tiếp theo</button>
+                </div>
+            </div>
+
+            <!-- Result View -->
+            <div id="student-result" class="hidden canva-card p-10 text-center space-y-6">
+                <div class="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-4xl mx-auto">
+                    <i class="fas fa-check-double"></i>
+                </div>
+                <h2 class="text-3xl font-black">Hoàn tất bài thi!</h2>
+                <div id="stFinalScoreBox" class="p-6 bg-slate-50 rounded-3xl border border-slate-100 hidden">
+                    <p class="text-slate-400 font-bold text-xs uppercase">Kết quả trắc nghiệm</p>
+                    <p class="text-7xl font-black text-indigo-600" id="stFinalScore">0/0</p>
+                </div>
+                <p class="text-slate-500">Dữ liệu của bạn đã được gửi lên máy chủ giáo viên.</p>
+                <button onclick="location.reload()" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold">Về trang chủ</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Cảnh báo -->
+    <div id="cheatModal" class="hidden fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-3xl max-w-sm w-full text-center space-y-4 shadow-2xl border-4 border-red-500">
+            <div class="text-red-500 text-5xl"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 class="text-2xl font-black text-slate-900">CẢNH BÁO VI PHẠM!</h3>
+            <p class="text-slate-500">Hành vi rời khỏi trang thi đã được ghi lại. Vi phạm quá 3 lần bài làm sẽ bị vô hiệu hóa.</p>
+            <button onclick="closeCheatModal()" class="w-full py-3 bg-red-500 text-white rounded-xl font-bold">Tôi đã hiểu</button>
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, collection, setDoc, addDoc, onSnapshot, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Khởi tạo cấu hình từ biến môi trường
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyAvV6kYG8RTg_07_GasKabW7V-TMySZ8F8",
-            authDomain: "game-44f7b.firebaseapp.com",
-            projectId: "game-44f7b",
-            storageBucket: "game-44f7b.firebasestorage.app",
-            messagingSenderId: "1019024917096",
-            appId: "1:1019024917096:web:84c195229e31be7f8631dd",
-
-        };
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'quiz-pro-v1';
-        
-        // Initialize Firebase
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'quiz-pro-v2-main';
 
-        let user = null;
+        // State
+        let questions = [];
+        let examSettings = { duration: 15, code: 'QUIZ-PRO-2024', showResults: true };
+        let studentAnswers = [];
+        let curIdx = 0;
+        let timerInterval = null;
+        let cheatCount = 0;
+        let currentStudentId = null;
+        let myChart = null;
+        let currentUser = null;
 
-        // Xử lý Authentication theo quy tắc bắt buộc
-        const initAuth = async () => {
+        // Init
+        window.onload = async () => {
             try {
+                // RULE 3: Auth BEFORE queries
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUser = user;
+                        initListeners();
+                    }
+                });
             } catch (error) {
-                console.error("Auth error:", error);
+                console.error("Lỗi xác thực:", error);
             }
         };
 
-        onAuthStateChanged(auth, (u) => {
-            user = u;
-            if (user && document.getElementById('resultView').classList.contains('hidden') === false) {
-                loadLeaderboard();
-            }
-        });
+        function initListeners() {
+            if (!currentUser) return;
 
-        // Gọi khởi tạo Auth ngay lập tức
-        initAuth();
+            // RULE 1: Strict paths & Error Handling
+            const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
+            onSnapshot(settingsRef, (snap) => {
+                if(snap.exists()) {
+                    examSettings = snap.data();
+                    const codeEl = document.getElementById('roomCode');
+                    const durEl = document.getElementById('examDuration');
+                    if (codeEl) codeEl.value = examSettings.code || '';
+                    if (durEl) durEl.value = examSettings.duration || 0;
+                }
+            }, (err) => console.error("Lỗi cấu hình:", err));
 
-        const questions = [
-            { q: "Thủ đô của Việt Nam là gì?", a: ["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Huế"], correct: 0 },
-            { q: "Phần mềm nào sau đây dùng để duyệt web?", a: ["Word", "Excel", "Google Chrome", "Photoshop"], correct: 2 },
-            { q: "1 + 1 bằng mấy?", a: ["1", "2", "3", "4"], correct: 1 },
-            { q: "Ngôn ngữ nào dùng để tạo cấu trúc trang web?", a: ["Python", "C++", "HTML", "Java"], correct: 2 }
-        ];
+            // Questions
+            const questionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'questions');
+            onSnapshot(questionsRef, (snap) => {
+                questions = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderQuestionsTable();
+            }, (err) => console.error("Lỗi danh sách câu hỏi:", err));
 
-        let currentQuestion = 0;
-        let userAnswers = Array(questions.length).fill(null);
-        let userName = "";
+            // Realtime Monitoring
+            const monitoringRef = collection(db, 'artifacts', appId, 'public', 'data', 'monitoring');
+            onSnapshot(monitoringRef, (snap) => {
+                renderMonitoring(snap.docs.map(d => d.data()));
+            }, (err) => console.error("Lỗi giám sát:", err));
 
-        window.startApp = async () => {
-            const input = document.getElementById('userName');
-            if (!input.value.trim()) return alert("Vui lòng nhập tên!");
-            
-            userName = input.value.trim();
-            document.getElementById('displayUserName').innerText = userName;
-            document.getElementById('userInitial').innerText = userName.charAt(0).toUpperCase();
-            
-            document.getElementById('authView').classList.add('hidden');
-            document.getElementById('quizView').classList.remove('hidden');
-            
-            showQuestion();
+            // Submissions & Analytics
+            const submissionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'submissions');
+            onSnapshot(submissionsRef, (snap) => {
+                updateAnalytics(snap.docs.map(d => d.data()));
+            }, (err) => console.error("Lỗi thống kê:", err));
+        }
+
+        // --- NAVIGATION ---
+        window.switchRole = (role) => {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${role}`).classList.add('active');
+            document.getElementById('teacherView').classList.toggle('hidden', role !== 'teacher');
+            document.getElementById('studentView').classList.toggle('hidden', role !== 'student');
+            if(role === 'teacher') showTeacherSection('monitoring');
         };
 
-        window.showQuestion = () => {
-            const q = questions[currentQuestion];
-            document.getElementById('currentQuestionNum').innerText = currentQuestion + 1;
-            document.getElementById('totalQuestionsNum').innerText = questions.length;
-            document.getElementById('questionText').innerText = q.q;
-            
-            const grid = document.getElementById('optionsGrid');
-            grid.innerHTML = '';
-            
-            q.a.forEach((opt, index) => {
-                const btn = document.createElement('div');
-                btn.className = `option-card p-5 rounded-2xl border-2 flex items-center gap-4 bg-white shadow-sm ${userAnswers[currentQuestion] === index ? 'selected' : 'border-slate-100'}`;
-                btn.innerHTML = `
-                    <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm ${userAnswers[currentQuestion] === index ? 'bg-purple-600 text-white border-purple-600' : 'border-slate-200 text-slate-400'}">
-                        ${String.fromCharCode(65 + index)}
+        window.showTeacherSection = (sec) => {
+            ['monitoring', 'quiz', 'analytics'].forEach(s => {
+                const el = document.getElementById(`section-${s}`);
+                if (el) el.classList.toggle('hidden', s !== sec);
+            });
+        };
+
+        // --- TEACHER LOGIC ---
+        window.addQuestion = async () => {
+            if (!currentUser) return;
+            const text = document.getElementById('qText').value;
+            const typeVal = document.getElementById('correctOpt').value;
+            if(!text) return;
+
+            const q = {
+                text,
+                type: typeVal === 'essay' ? 'essay' : 'choice',
+                correct: typeVal === 'essay' ? null : parseInt(typeVal),
+                options: [
+                    document.getElementById('opt0').value || "Đáp án A",
+                    document.getElementById('opt1').value || "Đáp án B",
+                    document.getElementById('opt2').value || "Đáp án C",
+                    document.getElementById('opt3').value || "Đáp án D"
+                ],
+                createdAt: Date.now()
+            };
+
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), q);
+            document.getElementById('qText').value = "";
+        };
+
+        function renderQuestionsTable() {
+            const container = document.getElementById('questionListDisplay');
+            if (!container) return;
+            container.innerHTML = questions.sort((a,b)=>a.createdAt-b.createdAt).map((q, i) => `
+                <div class="canva-card p-4 flex justify-between items-center group">
+                    <div class="flex gap-4 items-center">
+                        <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">${i+1}</div>
+                        <div>
+                            <p class="font-bold text-slate-700">${q.text}</p>
+                            <span class="text-[10px] font-black uppercase text-indigo-500">${q.type === 'essay' ? 'Tự luận' : 'Trắc nghiệm'}</span>
+                        </div>
                     </div>
-                    <span class="text-slate-700">${opt}</span>
-                `;
-                btn.onclick = () => selectOption(index);
-                grid.appendChild(btn);
+                    <button onclick="deleteQuestion('${q.id}')" class="text-slate-300 hover:text-red-500 transition-colors"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+
+        window.deleteQuestion = async (id) => {
+            if (!currentUser) return;
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questions', id));
+        };
+
+        window.saveSettings = async () => {
+            if (!currentUser) return;
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'), {
+                code: document.getElementById('roomCode').value,
+                duration: parseInt(document.getElementById('examDuration').value),
+                showResults: true
             });
-
-            document.getElementById('prevBtn').style.visibility = currentQuestion > 0 ? 'visible' : 'hidden';
-            document.getElementById('nextBtn').innerText = currentQuestion === questions.length - 1 ? 'NỘP BÀI' : 'Câu tiếp theo';
+            alert("Đã cập nhật cấu hình phòng thi!");
         };
 
-        window.selectOption = (index) => {
-            userAnswers[currentQuestion] = index;
-            showQuestion();
+        function renderMonitoring(data) {
+            const countEl = document.getElementById('onlineCount');
+            if (countEl) countEl.innerText = data.filter(d => d.status === 'doing').length;
+            const table = document.getElementById('monitoringTable');
+            if (!table) return;
+            table.innerHTML = data.map(d => `
+                <tr class="border-t border-slate-50 hover:bg-slate-50/50">
+                    <td class="p-4">
+                        <p class="font-bold">${d.name}</p>
+                        <p class="text-[10px] text-slate-400 font-mono">${d.id}</p>
+                    </td>
+                    <td class="p-4">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${d.status === 'done' ? 'bg-green-100 text-green-600' : 'bg-indigo-100 text-indigo-600'}">
+                            ${d.status === 'done' ? 'HOÀN THÀNH' : 'ĐANG LÀM'}
+                        </span>
+                    </td>
+                    <td class="p-4 w-48">
+                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-indigo-500 h-full" style="width: ${questions.length ? (d.progress/questions.length)*100 : 0}%"></div>
+                        </div>
+                    </td>
+                    <td class="p-4">
+                        <span class="font-bold ${d.cheats > 0 ? 'text-red-500' : 'text-green-500'}">
+                            <i class="fas fa-exclamation-circle mr-1"></i>${d.cheats}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateAnalytics(submissions) {
+            const subCountEl = document.getElementById('submittedCount');
+            const avgScoreEl = document.getElementById('avgScore');
+            if (subCountEl) subCountEl.innerText = submissions.length;
+            const avg = submissions.length ? (submissions.reduce((a,b)=>a+b.score,0) / submissions.length).toFixed(1) : 0.0;
+            if (avgScoreEl) avgScoreEl.innerText = avg;
+
+            // Chart
+            const freq = Array(11).fill(0);
+            submissions.forEach(s => freq[Math.round(s.score)]++);
+
+            const chartEl = document.getElementById('scoreChart');
+            if(chartEl) {
+                if(myChart) myChart.destroy();
+                const ctx = chartEl.getContext('2d');
+                myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [0,1,2,3,4,5,6,7,8,9,10],
+                        datasets: [{ label: 'Số lượng học sinh', data: freq, backgroundColor: '#6E41E2', borderRadius: 8 }]
+                    },
+                    options: { scales: { y: { beginAtZero: true, grid: { display: false } } } }
+                });
+            }
+
+            // Top Students
+            const top = [...submissions].sort((a,b) => b.score - a.score).slice(0, 5);
+            const topEl = document.getElementById('topStudents');
+            if (topEl) {
+                topEl.innerHTML = top.map((s, i) => `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <span class="font-black text-slate-300">#${i+1}</span>
+                            <p class="font-bold">${s.studentName}</p>
+                        </div>
+                        <span class="text-indigo-600 font-black">${s.score}/${s.total}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        window.exportFullExcel = () => {
+            alert("Đang chuẩn bị dữ liệu Excel...");
         };
 
-        window.nextQuestion = () => {
-            if (userAnswers[currentQuestion] === null) return alert("Vui lòng chọn một đáp án!");
+        // --- STUDENT LOGIC ---
+        window.startExam = async () => {
+            if (!currentUser) return;
+            const name = document.getElementById('stNameInput').value;
+            const sid = document.getElementById('stIdInput').value;
+            if(!name || !sid) return alert("Vui lòng điền đủ thông tin!");
+            if(questions.length === 0) return alert("Đề chưa có câu hỏi nào!");
+
+            currentStudentId = currentUser.uid; // Use Auth UID for reliability
+            document.getElementById('stDisplayName').innerText = name;
+            document.getElementById('stAvatar').innerText = name.charAt(0).toUpperCase();
             
-            if (currentQuestion < questions.length - 1) {
-                currentQuestion++;
-                showQuestion();
-            } else {
-                submitQuiz();
-            }
-        };
-
-        window.prevQuestion = () => {
-            if (currentQuestion > 0) {
-                currentQuestion--;
-                showQuestion();
-            }
-        };
-
-        async function submitQuiz() {
-            let score = 0;
-            userAnswers.forEach((ans, i) => {
-                if (ans === questions[i].correct) score++;
+            // Register monitoring
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'monitoring', currentStudentId), {
+                id: sid, name, status: 'doing', progress: 0, cheats: 0, startTime: Date.now()
             });
 
-            document.getElementById('quizView').classList.add('hidden');
-            document.getElementById('resultView').classList.remove('hidden');
-            document.getElementById('finalScore').innerText = `${score}/${questions.length}`;
+            studentAnswers = questions.map(q => ({ qid: q.id, answer: null, type: q.type }));
+            document.getElementById('student-login').classList.add('hidden');
+            document.getElementById('student-exam').classList.remove('hidden');
+            
+            renderStQuestion();
+            startTimer(examSettings.duration);
+            initAntiCheat();
+        };
 
-            if (!user) {
-                console.warn("Chưa đăng nhập, không thể lưu điểm.");
-                return;
-            }
-
-            try {
-                const resultsCol = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
-                await addDoc(resultsCol, {
-                    uid: user.uid,
-                    name: userName,
-                    score: score,
-                    total: questions.length,
-                    timestamp: new Date().getTime()
-                });
-                loadLeaderboard();
-            } catch (e) {
-                console.error("Lỗi khi lưu điểm: ", e);
-            }
+        function startTimer(min) {
+            let time = min * 60;
+            const disp = document.getElementById('stTimer');
+            timerInterval = setInterval(() => {
+                const m = Math.floor(time/60);
+                const s = time%60;
+                if (disp) disp.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if(time <= 0) { clearInterval(timerInterval); submitExam(); }
+                time--;
+            }, 1000);
         }
 
-        async function loadLeaderboard() {
-            if (!user) return;
-            try {
-                const resultsCol = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
-                const querySnapshot = await getDocs(resultsCol);
-                let allScores = [];
-                querySnapshot.forEach((doc) => allScores.push(doc.data()));
-                
-                allScores.sort((a, b) => b.score - a.score || b.timestamp - a.timestamp);
-                
-                const tbody = document.getElementById('leaderboardBody');
-                tbody.innerHTML = '';
-                
-                allScores.slice(0, 5).forEach((item, index) => {
-                    const row = document.createElement('tr');
-                    row.className = "border-t border-slate-50";
-                    row.innerHTML = `
-                        <td class="px-6 py-4 font-bold text-indigo-600">#${index + 1}</td>
-                        <td class="px-6 py-4 font-semibold text-slate-800">${item.name}</td>
-                        <td class="px-6 py-4 text-right font-black text-slate-900">${item.score}/${item.total}</td>
-                    `;
-                    tbody.appendChild(row);
-                });
-            } catch (e) {
-                console.error("Lỗi tải bảng xếp hạng:", e);
+        function renderStQuestion() {
+            const q = questions[curIdx];
+            if (!q) return;
+            document.getElementById('curIdxDisp').innerText = curIdx + 1;
+            document.getElementById('totalIdxDisp').innerText = questions.length;
+            document.getElementById('stQuestionText').innerText = q.text;
+            document.getElementById('stProgressBar').style.width = `${((curIdx+1)/questions.length)*100}%`;
+
+            const optBox = document.getElementById('stOptions');
+            const essayBox = document.getElementById('stEssayArea');
+
+            if(q.type === 'choice') {
+                optBox.classList.remove('hidden');
+                essayBox.classList.add('hidden');
+                optBox.innerHTML = q.options.map((o, i) => `
+                    <button onclick="stChoose(${i})" class="p-4 rounded-2xl border-2 text-left flex items-center gap-4 transition-all ${studentAnswers[curIdx].answer === i ? 'border-indigo-600 bg-indigo-50 font-bold' : 'border-slate-100 bg-white'}">
+                        <span class="w-8 h-8 rounded-full border-2 flex items-center justify-center ${studentAnswers[curIdx].answer === i ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-200'}">${String.fromCharCode(65+i)}</span>
+                        ${o}
+                    </button>
+                `).join('');
+            } else {
+                optBox.classList.add('hidden');
+                essayBox.classList.remove('hidden');
+                const area = document.getElementById('stEssayAnswer');
+                area.value = studentAnswers[curIdx].answer || "";
+                area.oninput = (e) => { studentAnswers[curIdx].answer = e.target.value; syncProgress(); };
             }
+
+            document.getElementById('nextBtn').innerText = curIdx === questions.length - 1 ? 'NỘP BÀI THI' : 'Câu tiếp theo';
         }
+
+        window.stChoose = async (idx) => {
+            studentAnswers[curIdx].answer = idx;
+            renderStQuestion();
+            syncProgress();
+        };
+
+        async function syncProgress() {
+            if (!currentUser || !currentStudentId) return;
+            const answered = studentAnswers.filter(a => a.answer !== null).length;
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'monitoring', currentStudentId), {
+                progress: answered
+            });
+        }
+
+        window.nextQ = () => {
+            if(curIdx < questions.length - 1) {
+                curIdx++;
+                renderStQuestion();
+            } else {
+                if(confirm("Xác nhận nộp bài?")) submitExam();
+            }
+        };
+
+        window.prevQ = () => { if(curIdx > 0) { curIdx--; renderStQuestion(); } };
+
+        async function submitExam() {
+            if (!currentUser) return;
+            clearInterval(timerInterval);
+            let score = 0;
+            questions.forEach((q, i) => {
+                if(q.type === 'choice' && studentAnswers[i].answer === q.correct) score++;
+            });
+
+            const sub = {
+                studentName: document.getElementById('stDisplayName').innerText,
+                studentId: currentStudentId,
+                score,
+                total: questions.filter(q => q.type === 'choice').length,
+                timestamp: Date.now(),
+                cheats: cheatCount
+            };
+
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'), sub);
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'monitoring', currentStudentId), {
+                status: 'done'
+            });
+
+            document.getElementById('student-exam').classList.add('hidden');
+            document.getElementById('student-result').classList.remove('hidden');
+            document.getElementById('stFinalScoreBox').classList.remove('hidden');
+            document.getElementById('stFinalScore').innerText = `${score}/${sub.total}`;
+        }
+
+        // --- ANTI CHEAT ---
+        function initAntiCheat() {
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === 'hidden') triggerCheat();
+            });
+            window.addEventListener("blur", triggerCheat);
+        }
+
+        async function triggerCheat() {
+            if(!currentUser || !currentStudentId) return;
+            if(document.getElementById('student-exam').classList.contains('hidden')) return;
+            cheatCount++;
+            const statusEl = document.getElementById('antiCheatStatus');
+            if (statusEl) {
+                statusEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Bảo mật: Vi phạm (${cheatCount})`;
+                statusEl.className = "text-[10px] font-bold text-red-500 uppercase flex items-center gap-1";
+            }
+            
+            document.getElementById('cheatModal').classList.remove('hidden');
+            
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'monitoring', currentStudentId), {
+                cheats: cheatCount
+            });
+        }
+
+        window.closeCheatModal = () => {
+            document.getElementById('cheatModal').classList.add('hidden');
+        };
+
     </script>
 </body>
 </html>
