@@ -3,369 +3,502 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuizPro - Quản lý thi trực tuyến</title>
+    <title>QuizPro - Hệ thống Thi Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Thư viện Excel và PDF -->
+    
+    <!-- Firebase Libraries -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvV6kYG8RTg_07_GasKabW7V-TMySZ8F8",
+            authDomain: "game-44f7b.firebaseapp.com",
+            projectId: "game-44f7b",
+            storageBucket: "game-44f7b.firebasestorage.app",
+            messagingSenderId: "1019024917096",
+            appId: "1:1019024917096:web:84c195229e31be7f8631dd",
+            measurementId: "G-0C3LEDLLRG"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'quiz-pro-v1';
+
+        // Gán vào window để truy cập toàn cục
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+        window.fs = { collection, doc, setDoc, getDoc, onSnapshot, query, addDoc, updateDoc };
+
+        // Xử lý Auth trước khi sync dữ liệu
+        const initAuth = async () => {
+            try {
+                // Thử đăng nhập bằng Custom Token nếu có
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } catch (tokenError) {
+                        console.warn("Custom token failed, falling back to anonymous sign-in:", tokenError);
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Critical Auth error:", error);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("Authenticated as:", user.uid);
+                window.currentUserUID = user.uid;
+                // Bắt đầu sync dữ liệu sau khi auth thành công
+                if (window.syncData) window.syncData();
+            }
+        });
+
+        initAuth();
+    </script>
+
+    <!-- Thư viện bổ trợ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
-        .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); transition: all 0.3s; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(79, 70, 229, 0.4); }
-        .nav-active { background-color: #6366f1; color: white; }
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+        body { font-family: 'Quicksand', sans-serif; background-color: #f0f2f5; }
+        .canva-gradient { background: linear-gradient(135deg, #00c4cc 0%, #7d2ae8 100%); }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .tab-active { border-bottom: 4px solid #7d2ae8; color: #7d2ae8; font-weight: 700; }
+        .answer-btn { transition: all 0.2s; border: 2px solid transparent; }
+        .answer-btn:hover { transform: scale(1.02); }
+        .answer-selected { border-color: #7d2ae8; background-color: #f3e8ff; }
         
-        /* CSS cho mẫu PDF xuất ra */
         #pdfTemplate {
-            width: 210mm;
-            padding: 20mm;
-            background: white;
-            color: black;
-            font-family: "Times New Roman", serif;
-            display: none; /* Ẩn đi, chỉ dùng để chụp ảnh xuất PDF */
+            width: 210mm; padding: 20mm; background: white; color: black;
+            font-family: "Times New Roman", serif; display: none;
         }
         .pdf-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .pdf-table th, .pdf-table td { border: 1px solid black; padding: 5px; text-align: center; }
-        .grid-answer { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-top: 10px; }
-        .grid-cell { border: 1px solid black; padding: 5px; text-align: center; height: 40px; }
+        .pdf-table th, .pdf-table td { border: 1px solid black; padding: 8px; text-align: center; }
+        .grid-answer { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 15px; }
+        .grid-cell { border: 1px solid black; padding: 5px; text-align: center; }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center gap-2">
-            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
-                <i class="fas fa-graduation-cap"></i>
-            </div>
-            <span class="text-xl font-bold text-gray-800">Quiz<span class="text-indigo-600">Pro</span></span>
-        </div>
-        <div class="flex bg-gray-100 p-1 rounded-xl">
-            <button onclick="switchRole('student')" id="btnStudent" class="px-6 py-2 rounded-lg font-medium transition-all nav-active">Học sinh</button>
-            <button onclick="switchRole('teacher')" id="btnTeacher" class="px-6 py-2 rounded-lg font-medium transition-all text-gray-500">Giáo viên</button>
-        </div>
-    </nav>
-
-    <main class="max-w-6xl mx-auto p-6">
-        <!-- ROLE: STUDENT -->
-        <div id="studentSection" class="block">
-            <div class="glass-card p-10 text-center max-w-lg mx-auto mt-10">
-                <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i class="fas fa-rocket text-3xl"></i>
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Navigation -->
+        <nav class="glass sticky top-0 z-40 px-6 py-4 flex justify-between items-center border-b shadow-sm">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 canva-gradient rounded-lg flex items-center justify-center text-white shadow-lg">
+                    <i class="fas fa-bolt text-xl"></i>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-800 mb-2">Chào mừng bạn!</h1>
-                <p class="text-gray-500 mb-8">Nhập thông tin để bắt đầu bài kiểm tra.</p>
-                
-                <div class="text-left space-y-4 mb-8">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Họ và tên:</label>
-                        <input type="text" id="studentName" placeholder="Ví dụ: Nguyễn Văn A" class="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500">
+                <span class="text-2xl font-bold tracking-tight text-gray-800">Quiz<span class="text-purple-600">Pro</span></span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="userInfo" class="text-sm font-medium text-gray-600">Đang kết nối...</span>
+                <button onclick="location.reload()" class="text-gray-400 hover:text-purple-600 transition-colors">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <main id="mainContainer" class="flex-grow p-4 md:p-8">
+            <!-- Role Selection -->
+            <div id="roleSelection" class="max-w-4xl mx-auto mt-20 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div onclick="initTeacher()" class="glass p-10 rounded-3xl text-center cursor-pointer hover:shadow-2xl transition-all border-2 border-transparent hover:border-purple-500 group">
+                    <div class="w-24 h-24 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-chalkboard-teacher text-4xl"></i>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Lớp:</label>
-                        <input type="text" id="studentClass" placeholder="Ví dụ: 9A1" class="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500">
+                    <h2 class="text-2xl font-bold mb-2">Giáo viên</h2>
+                    <p class="text-gray-500">Quản lý đề thi, học sinh và xem kết quả chi tiết.</p>
+                </div>
+                <div onclick="initStudent()" class="glass p-10 rounded-3xl text-center cursor-pointer hover:shadow-2xl transition-all border-2 border-transparent hover:border-cyan-500 group">
+                    <div class="w-24 h-24 bg-cyan-100 text-cyan-600 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-user-graduate text-4xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-2">Học sinh</h2>
+                    <p class="text-gray-500">Tham gia thi online, làm bài và xem điểm tức thì.</p>
+                </div>
+            </div>
+
+            <!-- Teacher View -->
+            <div id="teacherView" class="hidden max-w-6xl mx-auto">
+                <div class="flex gap-6 mb-8 border-b">
+                    <button onclick="showTab('exam')" id="tabExam" class="pb-4 px-2 tab-active transition-all">Đề thi</button>
+                    <button onclick="showTab('students')" id="tabStudents" class="pb-4 px-2 text-gray-500 transition-all">Học sinh</button>
+                    <button onclick="showTab('results')" id="tabResults" class="pb-4 px-2 text-gray-500 transition-all">Kết quả</button>
+                </div>
+
+                <div id="contentExam" class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Cài đặt đề thi</h3>
+                        <div class="flex gap-2">
+                             <button onclick="importFromWord()" class="bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md">
+                                <i class="fas fa-file-word mr-2"></i>Dán văn bản
+                            </button>
+                            <button onclick="saveExamSettings()" class="canva-gradient text-white px-6 py-2 rounded-xl font-bold shadow-lg">Lưu cài đặt</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="glass p-6 rounded-2xl space-y-4">
+                            <h4 class="font-bold text-purple-600 border-b pb-2">Cấu hình</h4>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 mb-1">Mã phòng thi</label>
+                                <input type="text" id="roomCode" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 mb-1">Thời gian (phút)</label>
+                                <input type="number" id="duration" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm">Hiện kết quả cho HS</span>
+                                <input type="checkbox" id="showResult" class="w-5 h-5 accent-purple-600">
+                            </div>
+                        </div>
+                        <div class="md:col-span-2 glass p-6 rounded-2xl">
+                            <div id="questionList" class="space-y-4 max-h-[500px] overflow-y-auto pr-2"></div>
+                            <button onclick="addQuestion()" class="w-full mt-4 py-3 border-2 border-dashed border-purple-200 rounded-xl text-purple-400 font-bold">+ Thêm câu hỏi</button>
+                        </div>
                     </div>
                 </div>
-                
-                <button onclick="submitExamDemo()" class="w-full btn-primary text-white font-bold py-4 rounded-2xl shadow-lg">VÀO PHÒNG THI</button>
-            </div>
-        </div>
 
-        <!-- ROLE: TEACHER DASHBOARD -->
-        <div id="teacherDashboard" class="hidden space-y-6">
-            <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-gray-800 italic border-l-4 border-indigo-600 pl-4">Quản lý Kết quả</h2>
-                <div class="flex gap-3">
-                    <button onclick="exportAllToExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
-                        <i class="fas fa-file-excel"></i> Xuất Excel (Toàn trường)
-                    </button>
-                    <button onclick="logout()" class="text-red-500 hover:text-red-700 font-medium text-sm">Đăng xuất</button>
-                </div>
-            </div>
-
-            <!-- Bảng kết quả -->
-            <div class="glass-card overflow-hidden">
-                <div class="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-                    <h3 class="font-bold text-gray-700">Danh sách bài làm gần đây</h3>
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" placeholder="Tìm theo lớp..." id="searchClass" oninput="filterResults()" class="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <div id="contentStudents" class="hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Danh sách học sinh</h3>
+                        <label class="canva-gradient text-white px-6 py-2 rounded-xl font-bold cursor-pointer"><i class="fas fa-file-import mr-2"></i>Import Excel
+                            <input type="file" id="excelInput" accept=".xlsx, .xls" class="hidden" onchange="handleExcelImport(event)">
+                        </label>
                     </div>
+                    <div class="glass rounded-2xl overflow-hidden"><table class="w-full text-left"><thead class="bg-gray-50 text-xs font-bold text-gray-400"><tr><th class="px-6 py-4">STT</th><th class="px-6 py-4">Họ và tên</th><th class="px-6 py-4">Mã lớp</th></tr></thead><tbody id="studentTableBody" class="divide-y divide-gray-100"></tbody></table></div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-xs font-bold text-gray-400 uppercase bg-gray-50">
-                                <th class="px-6 py-4">Học sinh</th>
-                                <th class="px-6 py-4">Lớp</th>
-                                <th class="px-6 py-4">Điểm TN</th>
-                                <th class="px-6 py-4">Thời gian nộp</th>
-                                <th class="px-6 py-4 text-right">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsBody" class="text-sm divide-y divide-gray-50 text-gray-600">
-                            <!-- Dữ liệu mẫu -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
 
-        <!-- ROLE: TEACHER LOGIN (Rút gọn cho demo) -->
-        <div id="teacherLoginSection" class="hidden">
-            <div class="glass-card p-10 text-center max-w-lg mx-auto mt-10">
-                <h1 class="text-2xl font-bold mb-6">Đăng nhập Giáo viên</h1>
-                <input type="password" id="adminPass" placeholder="Mật khẩu" class="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl mb-4 outline-none">
-                <button onclick="handleLogin()" class="w-full bg-gray-800 text-white font-bold py-4 rounded-2xl">ĐĂNG NHẬP</button>
-            </div>
-        </div>
-    </main>
-
-    <!-- MẪU PDF ẨN (Để render ảnh) -->
-    <div id="pdfContainer">
-        <div id="pdfTemplate">
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px;">
-                <div style="text-align: center; width: 45%;">
-                    <p style="font-weight: bold; margin: 0; font-size: 14px;">TRƯỜNG: PTDTNT THCS VĂN CHẤN</p>
-                    <p style="margin: 0; font-size: 12px;">Tổ: Khoa học tự nhiên</p>
-                </div>
-                <div style="text-align: center; width: 45%;">
-                    <p style="font-weight: bold; margin: 0; font-size: 14px;">ĐỀ KIỂM TRA HỌC KỲ</p>
-                    <p style="margin: 0; font-size: 12px;">Môn: Tin học 9</p>
+                <div id="contentResults" class="hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Bảng điểm</h3>
+                        <button onclick="exportResultsByClass()" class="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md"><i class="fas fa-file-excel mr-2"></i>Xuất Excel</button>
+                    </div>
+                    <div class="glass rounded-2xl overflow-hidden"><table class="w-full text-left"><thead class="bg-gray-50 text-xs font-bold text-gray-400"><tr><th class="px-6 py-4">Học sinh</th><th class="px-6 py-4">Lớp</th><th class="px-6 py-4">Điểm</th><th class="px-6 py-4">Nộp lúc</th><th class="px-6 py-4 text-right">Tải PDF</th></tr></thead><tbody id="resultsTableBody" class="divide-y divide-gray-100"></tbody></table></div>
                 </div>
             </div>
 
-            <div style="margin-bottom: 20px; line-height: 1.6;">
-                <p>Họ và tên thí sinh: <span id="pdfName" style="font-weight: bold; border-bottom: 1px dotted black; min-width: 200px; display: inline-block;"></span></p>
-                <p>Lớp: <span id="pdfClass" style="font-weight: bold; border-bottom: 1px dotted black; min-width: 100px; display: inline-block;"></span></p>
-                <p>Thời gian làm bài: <span id="pdfTime"></span></p>
-            </div>
+            <!-- Student View -->
+            <div id="studentView" class="hidden max-w-3xl mx-auto">
+                <div id="studentLogin" class="glass p-10 rounded-3xl text-center space-y-6 shadow-xl border-t-8 border-cyan-500">
+                    <h2 class="text-3xl font-black text-gray-800">BẮT ĐẦU THI</h2>
+                    <div class="space-y-4">
+                        <select id="selectStudent" class="w-full p-4 bg-gray-50 border rounded-2xl font-bold">
+                            <option value="">-- Chọn tên học sinh --</option>
+                        </select>
+                        <input type="text" id="manualName" placeholder="Hoặc tự nhập tên mới" class="w-full p-4 bg-gray-50 border rounded-2xl outline-none">
+                    </div>
+                    <button onclick="startExam()" class="w-full py-5 bg-cyan-500 text-white rounded-2xl font-black text-xl shadow-lg hover:bg-cyan-600">VÀO PHÒNG THI</button>
+                </div>
 
-            <table class="pdf-table" style="margin-bottom: 30px;">
-                <tr style="background: #f0f0f0;">
-                    <th>Điểm Trắc nghiệm</th>
-                    <th>Điểm Tự luận</th>
-                    <th>Tổng điểm</th>
-                </tr>
-                <tr>
-                    <td id="pdfScore" style="font-size: 20px; font-weight: bold;"></td>
-                    <td>(Giáo viên chấm)</td>
-                    <td style="font-size: 20px; font-weight: bold;">...</td>
-                </tr>
-            </table>
+                <div id="examArea" class="hidden space-y-6">
+                    <div class="flex justify-between items-center glass p-4 rounded-2xl sticky top-20 z-30 shadow-md">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-bold">
+                                <i class="fas fa-clock mr-1"></i><span id="timer">00:00</span>
+                            </div>
+                            <span id="examStudentName" class="font-bold text-gray-700"></span>
+                        </div>
+                        <button onclick="finishExam()" class="bg-red-500 text-white px-6 py-2 rounded-xl font-bold">NỘP BÀI</button>
+                    </div>
+                    <div id="questionsContainer" class="space-y-8 pb-20"></div>
+                </div>
 
-            <p style="font-weight: bold; text-transform: uppercase;">I. Phần trắc nghiệm lựa chọn (28 câu)</p>
-            <div id="pdfAnswersGrid" class="grid-answer">
-                <!-- Sẽ render các ô Câu 1, Câu 2... và đáp án đã chọn -->
-            </div>
-
-            <div style="margin-top: 30px;">
-                <p style="font-weight: bold; text-transform: uppercase;">II. Phần tự luận</p>
-                <p style="font-style: italic; color: #666;">(Nội dung câu trả lời tự luận của học sinh sẽ hiển thị tại đây nếu có dữ liệu)</p>
-                <div id="pdfEssayContent" style="border: 1px solid #ccc; min-height: 150px; padding: 10px; margin-top: 10px;"></div>
-            </div>
-            
-            <div style="margin-top: 40px; display: flex; justify-content: flex-end;">
-                <div style="text-align: center; width: 200px;">
-                    <p style="font-style: italic; font-size: 12px;">Ngày .... tháng .... năm 20...</p>
-                    <p style="font-weight: bold;">Người chấm bài</p>
-                    <div style="height: 80px;"></div>
-                    <p>(Ký và ghi rõ họ tên)</p>
+                <div id="studentResultView" class="hidden glass p-10 rounded-3xl text-center space-y-6 border-t-8 border-green-500">
+                    <div class="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto"><i class="fas fa-check-circle text-5xl"></i></div>
+                    <h2 class="text-3xl font-black">HOÀN THÀNH!</h2>
+                    <div class="text-5xl font-black text-purple-600 py-4" id="finalScoreDisplay">--/--</div>
+                    <div id="personalResultDetail" class="hidden text-left bg-gray-50 p-6 rounded-2xl border"></div>
+                    <button onclick="exportPersonalPDF()" id="btnPersonalPDF" class="w-full py-4 bg-purple-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2"><i class="fas fa-file-pdf"></i> Tải PDF kết quả</button>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
-    <!-- Modal Thông báo -->
-    <div id="customModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[100] p-4">
-        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-            <div id="modalIcon" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-indigo-100 text-indigo-600">
-                <i class="fas fa-info text-2xl"></i>
-            </div>
-            <h3 id="modalTitle" class="text-xl font-bold text-gray-800 mb-2"></h3>
-            <p id="modalMsg" class="text-gray-500 mb-6 text-sm"></p>
-            <button onclick="closeModal()" class="w-full py-3 bg-gray-800 text-white rounded-xl font-bold">Đóng</button>
+    <!-- Hidden PDF Template -->
+    <div id="pdfContainer"><div id="pdfTemplate">
+        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px;">
+            <div style="text-align: center; width: 45%;"><p style="font-weight: bold; font-size: 14px;">TRƯỜNG THCS & THPT QUIZPRO</p></div>
+            <div style="text-align: center; width: 45%;"><p style="font-weight: bold; font-size: 14px;">KẾT QUẢ KIỂM TRA</p><p id="pdfExamInfo" style="font-size: 12px;"></p></div>
         </div>
-    </div>
+        <div style="margin-bottom: 20px;"><p>Học sinh: <span id="pdfName" style="font-weight: bold;"></span></p><p>Mã lớp: <span id="pdfClass"></span></p><p>Thời điểm: <span id="pdfTime"></span></p></div>
+        <table class="pdf-table"><tr><th>Trắc nghiệm</th><th>Tự luận</th><th>TỔNG ĐIỂM</th></tr><tr><td id="pdfScoreTN"></td><td>Chưa chấm</td><td id="pdfScoreTotal" style="color: red; font-size: 20px;"></td></tr></table>
+        <div id="pdfAnswers" class="grid-answer"></div>
+        <div style="margin-top: 30px;"><p style="font-weight: bold;">II. Bài làm tự luận:</p><div id="pdfEssay" style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; min-height: 80px;"></div></div>
+    </div></div>
 
     <script>
-        // Dữ liệu giả lập kết quả
-        let resultsData = [
-            { id: 1, name: "Nguyễn Văn A", class: "9A1", score: "24/28", time: "15/04/2026 08:30", answers: ["A", "B", "C", "D", "A", "A", "B", "C", "D", "A", "B", "C", "D", "A", "B", "C", "D", "A", "B", "C", "D", "A", "B", "C", "D", "A", "B", "C"] },
-            { id: 2, name: "Trần Thị B", class: "9A1", score: "20/28", time: "15/04/2026 09:15", answers: Array(28).fill("B") },
-            { id: 3, name: "Lê Văn C", class: "9A2", score: "15/28", time: "15/04/2026 09:45", answers: Array(28).fill("C") }
-        ];
+        // --- DATA STATE ---
+        let currentRole = null;
+        let examData = { questions: [], duration: 15, showResult: true, roomCode: "QUIZ123" };
+        let studentsList = [];
+        let allResults = [];
+        let studentAnswers = {};
+        let examTimer = null;
+        let timeLeft = 0;
 
-        let isTeacherAuthenticated = false;
-
-        function switchRole(role) {
-            document.getElementById('studentSection').classList.add('hidden');
-            document.getElementById('teacherDashboard').classList.add('hidden');
-            document.getElementById('teacherLoginSection').classList.add('hidden');
+        // --- FIREBASE SYNC (Được gọi sau khi Auth thành công) ---
+        window.syncData = function() {
+            const { fs, db, appId } = window;
             
-            const btnS = document.getElementById('btnStudent');
-            const btnT = document.getElementById('btnTeacher');
-            btnS.className = "px-6 py-2 rounded-lg font-medium transition-all text-gray-500";
-            btnT.className = "px-6 py-2 rounded-lg font-medium transition-all text-gray-500";
-
-            if(role === 'student') {
-                document.getElementById('studentSection').classList.remove('hidden');
-                btnS.className = "px-6 py-2 rounded-lg font-medium transition-all nav-active";
-            } else {
-                btnT.className = "px-6 py-2 rounded-lg font-medium transition-all nav-active";
-                if(isTeacherAuthenticated) {
-                    document.getElementById('teacherDashboard').classList.remove('hidden');
-                    renderResults();
-                } else {
-                    document.getElementById('teacherLoginSection').classList.remove('hidden');
+            // Cài đặt đề thi
+            fs.onSnapshot(fs.doc(db, "artifacts", appId, "public", "data", "exam_config"), (docSnap) => {
+                if (docSnap.exists()) {
+                    examData = docSnap.data();
+                    if (currentRole === 'teacher') renderExamEditor();
                 }
-            }
+                document.getElementById('userInfo').innerText = "Đã kết nối";
+            }, (err) => console.error("Snapshot error config:", err));
+
+            // Danh sách HS
+            fs.onSnapshot(fs.collection(db, "artifacts", appId, "public", "data", "students"), (snapshot) => {
+                studentsList = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                if (currentRole === 'teacher') renderStudentTable();
+                if (currentRole === 'student') renderStudentSelect();
+            }, (err) => console.error("Snapshot error students:", err));
+
+            // Kết quả
+            fs.onSnapshot(fs.collection(db, "artifacts", appId, "public", "data", "results"), (snapshot) => {
+                allResults = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                if (currentRole === 'teacher') renderResultsTable();
+            }, (err) => console.error("Snapshot error results:", err));
+        };
+
+        // --- UI LOGIC ---
+        function initTeacher() {
+            const pass = prompt("Nhập mật khẩu giáo viên (123456):", "");
+            if (pass !== "123456") return alert("Mật khẩu sai!");
+            currentRole = 'teacher';
+            document.getElementById('roleSelection').classList.add('hidden');
+            document.getElementById('teacherView').classList.remove('hidden');
+            renderExamEditor();
         }
 
-        function handleLogin() {
-            const p = document.getElementById('adminPass').value;
-            if(p === "123456") {
-                isTeacherAuthenticated = true;
-                switchRole('teacher');
-            } else {
-                alert("Sai mật khẩu!");
-            }
+        function initStudent() {
+            currentRole = 'student';
+            document.getElementById('roleSelection').classList.add('hidden');
+            document.getElementById('studentView').classList.remove('hidden');
+            renderStudentSelect();
         }
 
-        function logout() {
-            isTeacherAuthenticated = false;
-            switchRole('teacher');
-        }
-
-        function renderResults(filter = "") {
-            const body = document.getElementById('resultsBody');
-            body.innerHTML = "";
-            const filtered = resultsData.filter(r => r.class.toLowerCase().includes(filter.toLowerCase()));
-            
-            filtered.forEach(res => {
-                body.innerHTML += `
-                    <tr class="hover:bg-gray-50 transition-all">
-                        <td class="px-6 py-4 font-bold text-gray-800">${res.name}</td>
-                        <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md text-xs font-bold">${res.class}</span></td>
-                        <td class="px-6 py-4 font-mono">${res.score}</td>
-                        <td class="px-6 py-4 text-xs text-gray-400">${res.time}</td>
-                        <td class="px-6 py-4 text-right space-x-2">
-                            <button onclick="exportSinglePDF(${res.id})" class="text-indigo-600 hover:text-indigo-800 text-xs font-bold"><i class="fas fa-file-pdf"></i> PDF</button>
-                        </td>
-                    </tr>
-                `;
+        function showTab(tab) {
+            ['Exam', 'Students', 'Results'].forEach(t => {
+                document.getElementById(`content${t}`).classList.add('hidden');
+                document.getElementById(`tab${t.toLowerCase()}`).classList.replace('tab-active', 'text-gray-500');
             });
+            document.getElementById(`content${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            document.getElementById(`tab${tab.toLowerCase()}`).classList.replace('text-gray-500', 'tab-active');
         }
 
-        function filterResults() {
-            const val = document.getElementById('searchClass').value;
-            renderResults(val);
-        }
-
-        // 1. XUẤT EXCEL TOÀN BỘ THEO MÃ LỚP
-        function exportAllToExcel() {
-            // Sắp xếp dữ liệu theo lớp trước khi xuất
-            const sortedData = [...resultsData].sort((a, b) => a.class.localeCompare(b.class));
-            
-            const ws_data = [
-                ["DANH SÁCH KẾT QUẢ KIỂM TRA"],
-                ["Ngày xuất:", new Date().toLocaleString()],
-                [],
-                ["STT", "Họ và tên", "Lớp", "Điểm trắc nghiệm", "Thời gian nộp"]
-            ];
-
-            sortedData.forEach((r, index) => {
-                ws_data.push([index + 1, r.name, r.class, r.score, r.time]);
-            });
-
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(ws_data);
-            XLSX.utils.book_append_sheet(wb, ws, "KetQua");
-            XLSX.writeFile(wb, `KetQua_TongHop_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`);
-            
-            showAlert("Thành công", "Đã tải xuống file Excel tổng hợp kết quả toàn trường.", "success");
-        }
-
-        // 2. XUẤT PDF CHI TIẾT NHƯ MẪU HÌNH ẢNH
-        async function exportSinglePDF(id) {
-            const res = resultsData.find(r => r.id === id);
-            if(!res) return;
-
-            // Đổ dữ liệu vào mẫu ẨN
-            document.getElementById('pdfName').innerText = res.name;
-            document.getElementById('pdfClass').innerText = res.class;
-            document.getElementById('pdfScore').innerText = res.score;
-            document.getElementById('pdfTime').innerText = res.time;
-
-            const grid = document.getElementById('pdfAnswersGrid');
-            grid.innerHTML = "";
-            // Giả lập 28 câu như hình ebc4cc.png
-            for(let i=1; i<=28; i++) {
-                const ans = res.answers[i-1] || "";
-                grid.innerHTML += `
-                    <div class="grid-cell">
-                        <div style="font-size: 8px; font-weight: bold; border-bottom: 1px solid #ddd;">Câu ${i}</div>
-                        <div style="font-size: 14px; font-weight: bold; color: blue;">${ans}</div>
+        function renderExamEditor() {
+            document.getElementById('roomCode').value = examData.roomCode || "";
+            document.getElementById('duration').value = examData.duration || 15;
+            document.getElementById('showResult').checked = !!examData.showResult;
+            const container = document.getElementById('questionList');
+            container.innerHTML = "";
+            (examData.questions || []).forEach((q, idx) => {
+                const div = document.createElement('div');
+                div.className = "p-4 bg-white border rounded-xl relative shadow-sm";
+                div.innerHTML = `
+                    <button onclick="removeQuestion(${idx})" class="absolute top-2 right-2 text-gray-300 hover:text-red-500">×</button>
+                    <input type="text" value="${q.text}" onchange="updateQuestion(${idx}, 'text', this.value)" class="w-full font-bold border-b mb-3 outline-none" placeholder="Câu hỏi?">
+                    <div class="grid grid-cols-2 gap-2">
+                        ${['A','B','C','D'].map(o => `
+                            <div class="flex items-center gap-2 text-xs">
+                                <input type="radio" name="correct_${idx}" ${q.correct === o ? 'checked' : ''} onchange="updateQuestion(${idx}, 'correct', '${o}')">
+                                <span>${o}:</span>
+                                <input type="text" value="${q.options[o]}" onchange="updateOption(${idx}, '${o}', this.value)" class="flex-grow border-b outline-none">
+                            </div>
+                        `).join('')}
                     </div>
                 `;
-            }
-
-            // Hiển thị mẫu để html2canvas chụp ảnh
-            const template = document.getElementById('pdfTemplate');
-            template.style.display = "block";
-
-            showAlert("Đang xử lý", "Hệ thống đang khởi tạo file PDF chuyên nghiệp...", "success");
-
-            // Chụp ảnh và tạo PDF
-            try {
-                const canvas = await html2canvas(template, { scale: 2 });
-                const imgData = canvas.toDataURL('image/png');
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const imgProps = pdf.getImageProperties(imgData);
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                
-                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                pdf.save(`Phieu_Ket_Qua_${res.name.replace(/\s/g, '_')}.pdf`);
-            } catch (err) {
-                console.error(err);
-                alert("Có lỗi khi tạo PDF.");
-            }
-
-            template.style.display = "none"; // Ẩn lại sau khi xong
-        }
-
-        function submitExamDemo() {
-            const name = document.getElementById('studentName').value;
-            const cls = document.getElementById('studentClass').value;
-            if(!name || !cls) return showAlert("Chú ý", "Bạn chưa nhập tên hoặc lớp!", "warning");
-            
-            showAlert("Thành công", "Dữ liệu học sinh đã được ghi nhận. Bạn có thể chuyển sang tab Giáo viên để xem kết quả.", "success");
-            
-            // Thêm dữ liệu giả lập vào danh sách
-            resultsData.unshift({
-                id: Date.now(),
-                name: name,
-                class: cls,
-                score: "Đang chấm",
-                time: new Date().toLocaleString(),
-                answers: Array(28).fill("?")
+                container.appendChild(div);
             });
         }
 
-        function showAlert(title, msg, type) {
-            const modal = document.getElementById('customModal');
-            document.getElementById('modalTitle').innerText = title;
-            document.getElementById('modalMsg').innerText = msg;
-            modal.classList.replace('hidden', 'flex');
+        function addQuestion() {
+            if(!examData.questions) examData.questions = [];
+            examData.questions.push({ text: "", options: {A:"",B:"",C:"",D:""}, correct: "A" });
+            renderExamEditor();
         }
 
-        function closeModal() {
-            document.getElementById('customModal').classList.replace('flex', 'hidden');
+        function removeQuestion(idx) { examData.questions.splice(idx,1); renderExamEditor(); }
+        function updateQuestion(i, k, v) { examData.questions[i][k] = v; }
+        function updateOption(i, o, v) { examData.questions[i].options[o] = v; }
+
+        async function saveExamSettings() {
+            const { fs, db, appId } = window;
+            examData.roomCode = document.getElementById('roomCode').value;
+            examData.duration = parseInt(document.getElementById('duration').value);
+            examData.showResult = document.getElementById('showResult').checked;
+            await fs.setDoc(fs.doc(db, "artifacts", appId, "public", "data", "exam_config"), examData);
+            alert("Đã lưu!");
+        }
+
+        function importFromWord() {
+            const raw = prompt("Dán thô kiểu: Câu 1: Hỏi gì? A. Đáp án 1 B. 2... (Mỗi câu 1 dòng)");
+            if(!raw) return;
+            const lines = raw.split('\n');
+            lines.forEach(l => {
+                if(l.trim()) examData.questions.push({ text: l, options: {A:"ĐA 1",B:"ĐA 2",C:"ĐA 3",D:"ĐA 4"}, correct: "A" });
+            });
+            renderExamEditor();
+        }
+
+        function renderStudentTable() {
+            const body = document.getElementById('studentTableBody');
+            body.innerHTML = studentsList.map((s,i) => `<tr><td class="px-6 py-4">${i+1}</td><td class="px-6 py-4 font-bold">${s.name}</td><td class="px-6 py-4">${s.class}</td></tr>`).join('');
+        }
+
+        function handleExcelImport(e) {
+            const { fs, db, appId } = window;
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                for (const row of data) {
+                    await fs.addDoc(fs.collection(db, "artifacts", appId, "public", "data", "students"), {
+                        name: row["Họ và tên"] || row["name"],
+                        class: row["Mã lớp"] || row["class"] || "Lớp X"
+                    });
+                }
+                alert("Đã import!");
+            };
+            reader.readAsBinaryString(e.target.files[0]);
+        }
+
+        function renderResultsTable() {
+            const body = document.getElementById('resultsTableBody');
+            body.innerHTML = allResults.map(r => `
+                <tr><td class="px-6 py-4 font-bold">${r.studentName}</td><td class="px-6 py-4">${r.class}</td><td class="px-6 py-4">${r.scoreTN}</td><td class="px-6 py-4 text-xs">${r.submittedAt}</td>
+                <td class="px-6 py-4 text-right"><button onclick="exportTeacherPDF('${r.id}')" class="text-purple-600"><i class="fas fa-file-pdf"></i></button></td></tr>
+            `).join('');
+        }
+
+        function exportResultsByClass() {
+            const data = allResults.map(r => ({ "Tên": r.studentName, "Lớp": r.class, "Điểm": r.scoreTN, "Ngày nộp": r.submittedAt }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "KetQua");
+            XLSX.writeFile(wb, "KetQua_Thi.xlsx");
+        }
+
+        function renderStudentSelect() {
+            const sel = document.getElementById('selectStudent');
+            sel.innerHTML = '<option value="">-- Chọn tên học sinh --</option>' + studentsList.map(s => `<option value="${s.id}">${s.name} (${s.class})</option>`).join('');
+        }
+
+        function startExam() {
+            const sId = document.getElementById('selectStudent').value;
+            const mName = document.getElementById('manualName').value;
+            let s = sId ? studentsList.find(x => x.id === sId) : { name: mName, class: "Tự do" };
+            if(!s.name) return alert("Cần tên!");
+            window.currentStudent = s;
+            document.getElementById('studentLogin').classList.add('hidden');
+            document.getElementById('examArea').classList.remove('hidden');
+            document.getElementById('examStudentName').innerText = s.name;
+            renderExamQuestions();
+            startTimer(examData.duration * 60);
+        }
+
+        function renderExamQuestions() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = (examData.questions || []).map((q, i) => `
+                <div class="glass p-6 rounded-3xl shadow-lg border-l-8 border-purple-500 space-y-4">
+                    <p class="text-xl font-bold">Câu ${i+1}: ${q.text}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        ${['A','B','C','D'].map(o => `
+                            <button onclick="selectAnswer(${i}, '${o}')" id="ans_${i}_${o}" class="answer-btn text-left p-4 rounded-2xl bg-gray-50 border-2 border-transparent font-medium">
+                                <span class="font-black mr-3 text-purple-600">${o}.</span> ${q.options[o]}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('') + `
+                <div class="glass p-8 rounded-3xl shadow-lg border-l-8 border-orange-500 space-y-4">
+                    <h3 class="text-xl font-bold">PHẦN TỰ LUẬN</h3>
+                    <textarea id="essayAnswer" class="w-full h-40 p-4 bg-gray-50 border-2 rounded-2xl outline-none" placeholder="Viết bài..."></textarea>
+                </div>
+            `;
+        }
+
+        function selectAnswer(qi, o) {
+            studentAnswers[qi] = o;
+            ['A','B','C','D'].forEach(opt => document.getElementById(`ans_${qi}_${opt}`).classList.remove('answer-selected', 'border-purple-500'));
+            document.getElementById(`ans_${qi}_${o}`).classList.add('answer-selected', 'border-purple-500');
+        }
+
+        function startTimer(sec) {
+            timeLeft = sec;
+            examTimer = setInterval(() => {
+                timeLeft--;
+                const m = Math.floor(timeLeft/60), s = timeLeft%60;
+                document.getElementById('timer').innerText = `${m}:${s < 10 ? '0'+s : s}`;
+                if(timeLeft <= 0) finishExam();
+            }, 1000);
+        }
+
+        async function finishExam() {
+            clearInterval(examTimer);
+            const { fs, db, appId } = window;
+            let score = 0;
+            examData.questions.forEach((q,i) => { if(studentAnswers[i] === q.correct) score++; });
+            const res = {
+                studentName: window.currentStudent.name, class: window.currentStudent.class,
+                scoreTN: `${score}/${examData.questions.length}`,
+                answers: studentAnswers, essay: document.getElementById('essayAnswer').value,
+                submittedAt: new Date().toLocaleString(), roomCode: examData.roomCode
+            };
+            await fs.addDoc(fs.collection(db, "artifacts", appId, "public", "data", "results"), res);
+            window.latestResult = res;
+            document.getElementById('examArea').classList.add('hidden');
+            document.getElementById('studentResultView').classList.remove('hidden');
+            document.getElementById('finalScoreDisplay').innerText = res.scoreTN;
+            if(examData.showResult) renderPersonalDetail(score);
+        }
+
+        function renderPersonalDetail() {
+            document.getElementById('personalResultDetail').classList.remove('hidden');
+            document.getElementById('personalResultDetail').innerHTML = "Chi tiết: " + examData.questions.map((q,i) => `<span>Q${i+1}: ${studentAnswers[i]||'-'}(${q.correct}) </span>`).join('');
+        }
+
+        async function exportPersonalPDF() {
+            const pdf = await generatePDF(window.latestResult);
+            pdf.save(`KetQua_${window.currentStudent.name}.pdf`);
+        }
+
+        async function exportTeacherPDF(id) {
+            const res = allResults.find(r => r.id === id);
+            const pdf = await generatePDF(res);
+            pdf.save(`KetQua_${res.studentName}.pdf`);
+        }
+
+        async function generatePDF(res) {
+            document.getElementById('pdfName').innerText = res.studentName;
+            document.getElementById('pdfClass').innerText = res.class;
+            document.getElementById('pdfTime').innerText = res.submittedAt;
+            document.getElementById('pdfScoreTN').innerText = res.scoreTN;
+            document.getElementById('pdfScoreTotal').innerText = res.scoreTN.split('/')[0];
+            document.getElementById('pdfEssay').innerText = res.essay || "Trống";
+            const grid = document.getElementById('pdfAnswers');
+            grid.innerHTML = examData.questions.map((q,i) => `<div class="grid-cell">Q${i+1}: ${res.answers[i]||'-'}</div>`).join('');
+            
+            const template = document.getElementById('pdfTemplate');
+            template.style.display = "block";
+            const canvas = await html2canvas(template);
+            const pdf = new jspdf.jsPDF();
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 10, 190, 0);
+            template.style.display = "none";
+            return pdf;
         }
     </script>
 </body>
