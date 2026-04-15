@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
@@ -19,33 +18,41 @@
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'quiz-pro-v4';
 
+        // Global access
         window.db = db;
         window.auth = auth;
         window.appId = appId;
         window.fs = { collection, doc, setDoc, getDoc, onSnapshot, query, addDoc, deleteDoc };
 
-        const startAuth = async () => {
+        // Authentication logic (RULE 3)
+        const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (err) { console.error("Auth Fail:", err); }
+                console.log("Auth successful");
+            } catch (err) {
+                console.error("Auth Error:", err);
+                document.getElementById('statusTxt').innerText = "Lỗi kết nối Server";
+            }
         };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 window.currentUser = user;
+                document.getElementById('statusIndicator').innerHTML = '<div class="w-2 h-2 rounded-full bg-emerald-500"></div><span>Hệ thống: Sẵn sàng</span>';
                 if (window.initializeSync) window.initializeSync();
+            } else {
+                document.getElementById('statusIndicator').innerHTML = '<div class="w-2 h-2 rounded-full bg-amber-500"></div><span>Đang kết nối...</span>';
             }
         });
 
-        startAuth();
+        initAuth();
     </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
@@ -65,10 +72,10 @@
         <!-- Header -->
         <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-100 px-6 py-4 flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <button id="btnHome" onclick="resetToHome()" class="hidden text-slate-400 hover:text-indigo-600 transition-colors">
+                <button id="btnHome" onclick="location.reload()" class="hidden text-slate-400 hover:text-indigo-600">
                     <i class="fas fa-arrow-left text-xl"></i>
                 </button>
-                <div class="flex items-center gap-2 cursor-pointer" onclick="resetToHome()">
+                <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
                     <div class="w-9 h-9 accent-gradient rounded-lg flex items-center justify-center text-white shadow-md">
                         <i class="fas fa-feather-pointed"></i>
                     </div>
@@ -76,7 +83,7 @@
                 </div>
             </div>
             <div id="statusIndicator" class="flex items-center gap-2 text-xs font-bold px-3 py-1 bg-slate-100 text-slate-500 rounded-full">
-                <div class="w-2 h-2 rounded-full bg-slate-300"></div>
+                <div class="w-2 h-2 rounded-full bg-slate-300 animate-pulse"></div>
                 <span id="statusTxt">Đang khởi tạo...</span>
             </div>
         </header>
@@ -85,18 +92,18 @@
             <!-- Role Selection -->
             <div id="view_role" class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12 max-w-4xl mx-auto">
                 <div onclick="selectRole('teacher')" class="glass-card p-10 rounded-3xl text-center cursor-pointer hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl group">
-                    <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110">
                         <i class="fas fa-user-tie text-3xl"></i>
                     </div>
                     <h2 class="text-2xl font-bold mb-2">Giáo viên</h2>
-                    <p class="text-slate-500 text-sm">Thiết lập đề thi, quản lý học sinh & xem kết quả.</p>
+                    <p class="text-slate-500 text-sm">Thiết lập đề thi & quản lý lớp học.</p>
                 </div>
                 <div onclick="selectRole('student')" class="glass-card p-10 rounded-3xl text-center cursor-pointer hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl group">
-                    <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110">
                         <i class="fas fa-graduation-cap text-3xl"></i>
                     </div>
                     <h2 class="text-2xl font-bold mb-2">Học sinh</h2>
-                    <p class="text-slate-500 text-sm">Vào phòng thi, làm bài trực tuyến & xem điểm.</p>
+                    <p class="text-slate-500 text-sm">Vào phòng thi & làm bài trực tuyến.</p>
                 </div>
             </div>
 
@@ -108,71 +115,64 @@
                     <button onclick="switchTab('results')" id="tab_results" class="pb-4 text-slate-400">Kết quả</button>
                 </nav>
 
-                <!-- Tab Exam -->
+                <!-- Pane Exam -->
                 <div id="pane_exam" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div class="lg:col-span-1 space-y-6">
                         <div class="glass-card p-6 rounded-2xl space-y-4">
-                            <h3 class="font-bold text-slate-800 border-b pb-2">Cấu hình chung</h3>
+                            <h3 class="font-bold text-slate-800 border-b pb-2">Cấu hình</h3>
                             <div>
-                                <label class="text-[10px] font-bold text-slate-400 uppercase">Mã phòng thi</label>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase">Mã phòng</label>
                                 <input type="text" id="cfg_room" class="w-full p-3 border rounded-xl font-bold uppercase focus:ring-2 ring-indigo-100 outline-none">
                             </div>
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase">Thời gian (phút)</label>
-                                <input type="number" id="cfg_time" class="w-full p-3 border rounded-xl font-bold focus:ring-2 ring-indigo-100 outline-none">
+                                <input type="number" id="cfg_time" value="15" class="w-full p-3 border rounded-xl font-bold focus:ring-2 ring-indigo-100 outline-none">
                             </div>
-                            <div class="flex items-center justify-between py-2">
-                                <span class="text-sm font-semibold">Công khai đáp án</span>
-                                <input type="checkbox" id="cfg_show" class="w-5 h-5 accent-indigo-600">
-                            </div>
-                            <button onclick="saveExam()" class="w-full py-4 accent-gradient text-white rounded-xl font-bold shadow-lg hover:opacity-90 transition-opacity">
+                            <button onclick="saveExam()" id="btnSaveExam" class="w-full py-4 accent-gradient text-white rounded-xl font-bold shadow-lg hover:opacity-90">
                                 <i class="fas fa-save mr-2"></i> LƯU ĐỀ THI
                             </button>
                         </div>
                     </div>
                     <div class="lg:col-span-2 space-y-4">
                         <div class="flex justify-between items-center px-2">
-                            <h3 class="font-bold text-lg">Danh sách câu hỏi</h3>
-                            <button onclick="showImport()" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100"><i class="fas fa-file-import mr-1"></i> NHẬP NHANH</button>
+                            <h3 class="font-bold text-lg">Câu hỏi</h3>
+                            <button onclick="showImport()" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">NHẬP NHANH</button>
                         </div>
-                        <div id="q_list" class="space-y-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar"></div>
-                        <button onclick="addQuestion()" class="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-indigo-300 hover:text-indigo-500 font-bold transition-all">
+                        <div id="q_list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar"></div>
+                        <button onclick="addQuestion()" class="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold">
                             <i class="fas fa-plus-circle mr-2"></i> Thêm câu hỏi
                         </button>
                     </div>
                 </div>
 
-                <!-- Tab Students -->
+                <!-- Pane Students -->
                 <div id="pane_students" class="hidden space-y-6">
                     <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-lg">Danh sách lớp</h3>
-                        <label class="bg-emerald-600 text-white px-5 py-2 rounded-xl font-bold text-sm cursor-pointer hover:bg-emerald-700 shadow-md">
+                        <h3 class="font-bold text-lg">Danh sách học sinh</h3>
+                        <label class="bg-emerald-600 text-white px-5 py-2 rounded-xl font-bold text-sm cursor-pointer shadow-md">
                             <i class="fas fa-file-excel mr-2"></i> Nhập Excel
                             <input type="file" id="excel_in" class="hidden" onchange="importExcel(event)">
                         </label>
                     </div>
-                    <div class="glass-card rounded-2xl overflow-hidden shadow-sm">
+                    <div class="glass-card rounded-2xl overflow-hidden">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 border-b">
                                 <tr>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">STT</th>
-                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Họ và Tên</th>
+                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Tên</th>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Lớp</th>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">Xóa</th>
                                 </tr>
                             </thead>
-                            <tbody id="student_tbody" class="divide-y divide-slate-100 bg-white"></tbody>
+                            <tbody id="student_tbody" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- Tab Results -->
+                <!-- Pane Results -->
                 <div id="pane_results" class="hidden space-y-6">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-lg">Bảng điểm tổng hợp</h3>
-                        <button onclick="exportExcelResults()" class="bg-indigo-600 text-white px-5 py-2 rounded-xl font-bold text-sm shadow-md">Xuất File Excel</button>
-                    </div>
-                    <div class="glass-card rounded-2xl overflow-hidden shadow-sm">
+                    <h3 class="font-bold text-lg">Bảng điểm</h3>
+                    <div class="glass-card rounded-2xl overflow-hidden">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 border-b">
                                 <tr>
@@ -180,10 +180,9 @@
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Mã đề</th>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Điểm TN</th>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Thời gian</th>
-                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">PDF</th>
                                 </tr>
                             </thead>
-                            <tbody id="result_tbody" class="divide-y divide-slate-100 bg-white"></tbody>
+                            <tbody id="result_tbody" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
                 </div>
@@ -193,127 +192,113 @@
             <div id="view_student" class="hidden max-w-2xl mx-auto">
                 <div id="student_auth" class="glass-card p-10 rounded-3xl shadow-xl space-y-8">
                     <div class="text-center space-y-2">
-                        <h2 class="text-3xl font-extrabold text-slate-800">Bắt đầu thi</h2>
-                        <p class="text-slate-400">Vui lòng điền thông tin bên dưới</p>
+                        <h2 class="text-3xl font-extrabold">Bắt đầu thi</h2>
+                        <p class="text-slate-400">Điền thông tin bên dưới</p>
                     </div>
                     <div class="space-y-4">
                         <div>
-                            <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Họ và Tên (Chọn hoặc Nhập)</label>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Họ tên</label>
                             <div class="flex gap-2">
-                                <select id="s_select" class="flex-grow p-4 border rounded-2xl font-bold outline-none focus:border-indigo-500 bg-white">
-                                    <option value="">-- Chọn trong danh sách --</option>
+                                <select id="s_select" class="flex-grow p-4 border rounded-2xl font-bold bg-white outline-none">
+                                    <option value="">-- Chọn tên --</option>
                                 </select>
-                                <input type="text" id="s_manual" placeholder="Tên tự do..." class="w-1/2 p-4 border rounded-2xl outline-none focus:border-indigo-500">
+                                <input type="text" id="s_manual" placeholder="Tên khác..." class="w-1/2 p-4 border rounded-2xl outline-none">
                             </div>
                         </div>
                         <div>
-                            <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Mã đề thi (Bắt buộc)</label>
-                            <input type="text" id="s_code" placeholder="Ví dụ: 001" class="w-full p-4 border-2 border-indigo-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 uppercase">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Mã đề thi</label>
+                            <input type="text" id="s_code" placeholder="Nhập mã đề (ví dụ: 001)" class="w-full p-4 border-2 border-indigo-50 rounded-2xl font-black text-xl outline-none uppercase">
                         </div>
                     </div>
-                    <button onclick="startExam()" class="w-full py-5 accent-gradient text-white rounded-2xl font-black text-xl shadow-xl hover:scale-[1.01] transition-all">
-                        VÀO THI NGAY <i class="fas fa-chevron-right ml-2"></i>
+                    <button onclick="startExam()" class="w-full py-5 accent-gradient text-white rounded-2xl font-black text-xl shadow-xl">
+                        VÀO THI <i class="fas fa-chevron-right ml-2"></i>
                     </button>
                 </div>
 
                 <div id="student_taking" class="hidden space-y-8">
-                    <div class="sticky top-20 z-40 flex justify-between items-center glass-card p-4 rounded-2xl shadow-lg border-indigo-100">
-                        <div class="flex items-center gap-4">
-                            <div class="px-4 py-2 bg-red-50 text-red-600 rounded-xl font-black text-xl border border-red-100">
-                                <i class="fas fa-clock mr-2"></i><span id="timer">00:00</span>
-                            </div>
-                            <div class="text-xs font-bold text-slate-400">
-                                <p id="s_disp_name" class="text-slate-800"></p>
-                                <p id="s_disp_code" class="text-indigo-500"></p>
-                            </div>
+                    <div class="sticky top-20 z-40 flex justify-between items-center glass-card p-4 rounded-2xl shadow-lg">
+                        <div class="px-4 py-2 bg-red-50 text-red-600 rounded-xl font-black text-xl border border-red-100">
+                            <i class="fas fa-clock mr-2"></i><span id="timer">00:00</span>
                         </div>
-                        <button onclick="submitExam()" class="px-8 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors">NỘP BÀI</button>
+                        <button onclick="submitExam()" id="btnSubmit" class="px-8 py-3 bg-red-600 text-white rounded-xl font-bold">NỘP BÀI</button>
                     </div>
                     <div id="exam_render" class="space-y-6 pb-20"></div>
                 </div>
 
-                <div id="student_finished" class="hidden glass-card p-12 rounded-3xl text-center space-y-6 shadow-2xl border-t-8 border-emerald-500">
+                <div id="student_finished" class="hidden glass-card p-12 rounded-3xl text-center space-y-6 shadow-2xl">
                     <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl">
                         <i class="fas fa-check"></i>
                     </div>
-                    <div>
-                        <h2 class="text-3xl font-black">Nộp bài thành công!</h2>
-                        <p class="text-slate-400 mt-2">Dữ liệu đã được ghi nhận vào hệ thống.</p>
-                    </div>
+                    <h2 class="text-3xl font-black">Nộp bài thành công!</h2>
                     <div class="py-8 bg-slate-50 rounded-2xl border border-slate-100">
                         <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Điểm trắc nghiệm</p>
                         <div id="final_score" class="text-6xl font-black text-indigo-600">--/--</div>
                     </div>
-                    <button onclick="downloadPDF()" class="w-full py-4 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2">
-                        <i class="fas fa-download"></i> TẢI KẾT QUẢ PDF
-                    </button>
+                    <button onclick="location.reload()" class="w-full py-4 bg-slate-900 text-white rounded-xl font-bold">QUAY LẠI</button>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Modals -->
+    <!-- Notification -->
+    <div id="toast" class="fixed bottom-8 right-8 px-6 py-3 rounded-xl text-white font-bold shadow-xl opacity-0 transition-opacity duration-300 z-[999] pointer-events-none"></div>
+
+    <!-- Modal Import -->
     <div id="modal_import" class="fixed inset-0 bg-slate-900/60 z-[100] hidden flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-xl rounded-3xl p-8 shadow-2xl space-y-6">
             <h4 class="text-2xl font-bold">Nhập liệu nhanh</h4>
-            <textarea id="import_txt" class="w-full h-80 p-4 border rounded-2xl outline-none focus:border-indigo-500 font-medium text-sm" placeholder="Câu 1: Câu hỏi...&#10;A. Lựa chọn 1&#10;B. Lựa chọn 2&#10;C. Lựa chọn 3&#10;D. Lựa chọn 4"></textarea>
+            <p class="text-xs text-slate-400">Định dạng: Câu 1: [Câu hỏi] - Xuống dòng A. B. C. D.</p>
+            <textarea id="import_txt" class="w-full h-80 p-4 border rounded-2xl outline-none font-medium text-sm" placeholder="Câu 1: ..."></textarea>
             <div class="flex justify-end gap-3">
-                <button onclick="hideImport()" class="px-5 py-2 font-bold text-slate-400">Đóng</button>
+                <button onclick="hideImport()" class="px-5 py-2 font-bold text-slate-400">Hủy</button>
                 <button onclick="parseImport()" class="px-8 py-2 bg-indigo-600 text-white rounded-xl font-bold">Xử lý</button>
             </div>
         </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-8 right-8 px-6 py-3 rounded-xl text-white font-bold shadow-xl translate-y-20 opacity-0 transition-all duration-300 z-[999]"></div>
-
     <script>
-        // State
         let state = {
-            exam: { questions: [], duration: 15, showResult: true, roomCode: "P01" },
+            exam: { questions: [], duration: 15, roomCode: "P01" },
             students: [],
             results: [],
-            session: { answers: {}, essay: "", timer: null, time: 0, user: null, code: "" }
+            session: { answers: {}, user: null, code: "", time: 0, timer: null }
         };
 
-        // Firebase Sync
+        function showToast(msg, type='success') {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.backgroundColor = type === 'success' ? '#10b981' : '#ef4444';
+            t.style.opacity = '1';
+            setTimeout(() => t.style.opacity = '0', 3000);
+        }
+
         window.initializeSync = function() {
             const { db, appId, fs } = window;
             
-            // Sync Config
+            // Sync Exam Config
             fs.onSnapshot(fs.doc(db, "artifacts", appId, "public", "data", "config", "exam"), (snap) => {
                 if (snap.exists()) {
                     state.exam = snap.data();
                     if (state.role === 'teacher') renderQuestions();
                 }
-            });
+            }, (err) => console.error("Sync Exam Fail:", err));
 
             // Sync Students
             fs.onSnapshot(fs.collection(db, "artifacts", appId, "public", "data", "students"), (snap) => {
                 state.students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (state.role === 'teacher') renderStudentList();
                 if (state.role === 'student') populateStudentSelect();
-            });
+            }, (err) => console.error("Sync Students Fail:", err));
 
             // Sync Results
             fs.onSnapshot(fs.collection(db, "artifacts", appId, "public", "data", "results"), (snap) => {
                 state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (state.role === 'teacher') renderResults();
-            });
-
-            document.getElementById('statusIndicator').innerHTML = '<div class="w-2 h-2 rounded-full bg-emerald-500"></div><span>Hệ thống: Sẵn sàng</span>';
-        }
-
-        // Utils
-        function showToast(msg, type='success') {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.style.backgroundColor = type === 'success' ? '#10b981' : '#ef4444';
-            t.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 3000);
-        }
+            }, (err) => console.error("Sync Results Fail:", err));
+        };
 
         function selectRole(r) {
+            if (!window.currentUser) return showToast("Vui lòng chờ hệ thống kết nối...", "error");
             state.role = r;
             document.getElementById('view_role').classList.add('hidden');
             document.getElementById('btnHome').classList.remove('hidden');
@@ -322,36 +307,21 @@
             else populateStudentSelect();
         }
 
-        function resetToHome() {
-            location.reload();
-        }
-
-        function switchTab(t) {
-            ['exam', 'students', 'results'].forEach(p => {
-                document.getElementById(`pane_${p}`).classList.add('hidden');
-                document.getElementById(`tab_${p}`).className = "pb-4 text-slate-400";
-            });
-            document.getElementById(`pane_${t}`).classList.remove('hidden');
-            document.getElementById(`tab_${t}`).className = "pb-4 nav-active";
-        }
-
-        // Teacher Actions
+        // --- Teacher Logic ---
         function renderQuestions() {
             document.getElementById('cfg_room').value = state.exam.roomCode;
             document.getElementById('cfg_time').value = state.exam.duration;
-            document.getElementById('cfg_show').checked = state.exam.showResult;
-
             const container = document.getElementById('q_list');
             container.innerHTML = (state.exam.questions || []).map((q, i) => `
                 <div class="glass-card p-6 rounded-2xl relative border-l-4 border-indigo-500">
                     <button onclick="removeQ(${i})" class="absolute top-4 right-4 text-slate-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
                     <div class="mb-4">
                         <span class="text-[10px] font-black text-indigo-600 block mb-1">CÂU HỎI ${i+1}</span>
-                        <input type="text" value="${q.text}" onchange="editQ(${i}, 'text', this.value)" class="w-full bg-transparent border-b border-slate-100 py-2 font-bold outline-none focus:border-indigo-400">
+                        <input type="text" value="${q.text}" onchange="editQ(${i}, 'text', this.value)" class="w-full bg-transparent border-b border-slate-100 py-2 font-bold outline-none">
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         ${['A','B','C','D'].map(o => `
-                            <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
+                            <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-xl">
                                 <input type="radio" name="ans_${i}" ${q.correct === o ? 'checked' : ''} onchange="editQ(${i}, 'correct', '${o}')" class="w-4 h-4 accent-indigo-600">
                                 <span class="font-bold text-slate-400 text-xs">${o}</span>
                                 <input type="text" value="${q.options[o]}" onchange="editOpt(${i}, '${o}', this.value)" class="bg-transparent text-sm w-full outline-none">
@@ -363,7 +333,8 @@
         }
 
         function addQuestion() {
-            state.exam.questions.push({ text: "Câu hỏi mới", options: {A:"", B:"", C:"", D:""}, correct: "A" });
+            if (!state.exam.questions) state.exam.questions = [];
+            state.exam.questions.push({ text: "Nội dung câu hỏi...", options: {A:"", B:"", C:"", D:""}, correct: "A" });
             renderQuestions();
         }
 
@@ -372,20 +343,30 @@
         function editOpt(i, o, v) { state.exam.questions[i].options[o] = v; }
 
         async function saveExam() {
+            if (!window.currentUser) return showToast("Lỗi xác thực", "error");
+            const btn = document.getElementById('btnSaveExam');
+            btn.disabled = true;
+            btn.innerText = "ĐANG LƯU...";
+
             const { db, appId, fs } = window;
             state.exam.roomCode = document.getElementById('cfg_room').value.trim() || "P01";
             state.exam.duration = parseInt(document.getElementById('cfg_time').value) || 15;
-            state.exam.showResult = document.getElementById('cfg_show').checked;
 
             try {
+                // RULE 1: Standard path
                 await fs.setDoc(fs.doc(db, "artifacts", appId, "public", "data", "config", "exam"), state.exam);
-                showToast("Đã lưu đề thi thành công!");
-            } catch (e) { showToast("Lỗi lưu đề: " + e.message, 'error'); }
+                showToast("Lưu đề thi thành công!");
+            } catch (e) {
+                console.error(e);
+                showToast("Lỗi lưu đề: " + e.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "LƯU ĐỀ THI";
+            }
         }
 
-        // Excel Import (FIXED)
         async function importExcel(e) {
-            const { db, appId, fs } = window;
+            if (!window.currentUser) return;
             const file = e.target.files[0];
             if (!file) return;
 
@@ -396,11 +377,12 @@
                     const wb = XLSX.read(bstr, { type: 'binary' });
                     const ws = wb.Sheets[wb.SheetNames[0]];
                     const data = XLSX.utils.sheet_to_json(ws);
+                    const { db, appId, fs } = window;
                     
                     let count = 0;
                     for (let row of data) {
-                        const name = row["Họ tên"] || row["Họ và Tên"] || row["Tên"] || row["name"];
-                        const cls = row["Lớp"] || row["class"] || "Tự do";
+                        const name = row["Họ tên"] || row["Họ và Tên"] || row["Tên"] || row["name"] || row["Full Name"];
+                        const cls = row["Lớp"] || row["class"] || row["Class"] || "Tự do";
                         if (name) {
                             await fs.addDoc(fs.collection(db, "artifacts", appId, "public", "data", "students"), {
                                 name: String(name).trim(),
@@ -409,8 +391,8 @@
                             count++;
                         }
                     }
-                    showToast(`Đã nhập thành công ${count} học sinh!`);
-                } catch (err) { showToast("Lỗi đọc file: " + err.message, 'error'); }
+                    showToast(`Đã nhập ${count} học sinh!`);
+                } catch (err) { showToast("Lỗi Excel: " + err.message, "error"); }
             };
             reader.readAsBinaryString(file);
         }
@@ -430,12 +412,11 @@
 
         async function deleteStudent(id) {
             const { db, appId, fs } = window;
-            if (confirm("Xóa học sinh này khỏi danh sách?")) {
+            if (confirm("Xóa học sinh này?")) {
                 await fs.deleteDoc(fs.doc(db, "artifacts", appId, "public", "data", "students", id));
             }
         }
 
-        // Results View
         function renderResults() {
             document.getElementById('result_tbody').innerHTML = state.results.map(r => `
                 <tr>
@@ -445,18 +426,15 @@
                     </td>
                     <td class="px-6 py-4 font-mono font-bold text-indigo-500">${r.code}</td>
                     <td class="px-6 py-4 font-black text-indigo-600">${r.score}</td>
-                    <td class="px-6 py-4 text-xs font-medium text-slate-500">${r.time}</td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="downloadOnePDF('${r.id}')" class="text-indigo-400 hover:text-indigo-600"><i class="fas fa-file-pdf text-xl"></i></button>
-                    </td>
+                    <td class="px-6 py-4 text-xs text-slate-500">${r.time}</td>
                 </tr>
             `).join('');
         }
 
-        // Student Actions
+        // --- Student Logic ---
         function populateStudentSelect() {
             const sel = document.getElementById('s_select');
-            sel.innerHTML = '<option value="">-- Chọn trong danh sách --</option>' + 
+            sel.innerHTML = '<option value="">-- Chọn tên --</option>' + 
                 state.students.map(s => `<option value="${s.id}">${s.name} (${s.class})</option>`).join('');
         }
 
@@ -465,33 +443,30 @@
             const man = document.getElementById('s_manual').value.trim();
             const code = document.getElementById('s_code').value.trim();
 
-            if (!code) return showToast("Vui lòng nhập Mã đề thi!", 'error');
+            if (!code) return showToast("Chưa nhập Mã đề thi!", "error");
             
             let user = sid ? state.students.find(x => x.id === sid) : (man ? { name: man, class: "Tự do" } : null);
-            if (!user) return showToast("Vui lòng chọn hoặc nhập tên!", 'error');
+            if (!user) return showToast("Chưa chọn/nhập tên!", "error");
 
             state.session.user = user;
             state.session.code = code;
             state.session.answers = {};
-            state.session.essay = "";
 
             document.getElementById('student_auth').classList.add('hidden');
             document.getElementById('student_taking').classList.remove('hidden');
-            document.getElementById('s_disp_name').innerText = user.name;
-            document.getElementById('s_disp_code').innerText = "MÃ ĐỀ: " + code;
-
-            renderExam();
+            
+            renderExamArea();
             startTimer(state.exam.duration * 60);
         }
 
-        function renderExam() {
+        function renderExamArea() {
             const box = document.getElementById('exam_render');
             box.innerHTML = (state.exam.questions || []).map((q, i) => `
-                <div class="glass-card p-8 rounded-3xl shadow-sm border-l-8 border-indigo-500">
+                <div class="glass-card p-8 rounded-3xl border-l-8 border-indigo-500 shadow-sm">
                     <p class="text-xl font-bold mb-6">${i+1}. ${q.text}</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         ${['A','B','C','D'].map(o => `
-                            <div onclick="ansQ(${i},'${o}')" id="q_${i}_${o}" class="option-item p-5 rounded-2xl flex items-center gap-4">
+                            <div onclick="pickAns(${i},'${o}')" id="q_${i}_${o}" class="option-item p-4 rounded-2xl flex items-center gap-4">
                                 <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black text-slate-400">${o}</div>
                                 <span class="font-semibold">${q.options[o]}</span>
                             </div>
@@ -500,13 +475,13 @@
                 </div>
             `).join('') + `
                 <div class="glass-card p-8 rounded-3xl border-l-8 border-amber-500">
-                    <p class="text-lg font-bold text-amber-600 mb-4 uppercase"><i class="fas fa-edit mr-2"></i> Bài làm tự luận</p>
-                    <textarea id="essay" class="w-full h-64 p-6 border rounded-2xl outline-none focus:border-amber-400 font-medium" placeholder="Nhập bài làm của bạn..."></textarea>
+                    <p class="text-lg font-bold text-amber-600 mb-4 uppercase">Bài làm tự luận</p>
+                    <textarea id="essay" class="w-full h-48 p-4 border rounded-2xl outline-none" placeholder="Nhập bài..."></textarea>
                 </div>
             `;
         }
 
-        function ansQ(qi, o) {
+        function pickAns(qi, o) {
             state.session.answers[qi] = o;
             ['A','B','C','D'].forEach(opt => {
                 const el = document.getElementById(`q_${qi}_${opt}`);
@@ -522,17 +497,22 @@
             state.session.time = sec;
             state.session.timer = setInterval(() => {
                 state.session.time--;
+                if (state.session.time <= 0) submitExam();
                 const m = Math.floor(state.session.time / 60);
                 const s = state.session.time % 60;
                 document.getElementById('timer').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-                if (state.session.time <= 0) submitExam();
             }, 1000);
         }
 
         async function submitExam() {
+            if (!window.currentUser) return showToast("Lỗi kết nối Server", "error");
             clearInterval(state.session.timer);
-            const { db, appId, fs } = window;
             
+            const btn = document.getElementById('btnSubmit');
+            btn.disabled = true;
+            btn.innerText = "ĐANG GỬI...";
+
+            const { db, appId, fs } = window;
             let correct = 0;
             (state.exam.questions || []).forEach((q, i) => {
                 if (state.session.answers[i] === q.correct) correct++;
@@ -542,29 +522,31 @@
                 name: state.session.user.name,
                 class: state.session.user.class,
                 code: state.session.code,
-                score: `${correct}/${state.exam.questions.length}`,
+                score: `${correct}/${(state.exam.questions || []).length}`,
                 answers: state.session.answers,
                 essay: document.getElementById('essay').value,
-                time: new Date().toLocaleString('vi-VN'),
-                room: state.exam.roomCode
+                time: new Date().toLocaleString('vi-VN')
             };
 
             try {
                 await fs.addDoc(fs.collection(db, "artifacts", appId, "public", "data", "results"), result);
-                window.lastResult = result;
                 document.getElementById('student_taking').classList.add('hidden');
                 document.getElementById('student_finished').classList.remove('hidden');
                 document.getElementById('final_score').innerText = result.score;
-            } catch (e) { showToast("Lỗi gửi bài: " + e.message, 'error'); }
+            } catch (e) {
+                showToast("Lỗi nộp bài: " + e.message, "error");
+                btn.disabled = false;
+                btn.innerText = "NỘP BÀI";
+            }
         }
 
-        // PDF & Export
+        // Import logic
         function showImport() { document.getElementById('modal_import').classList.remove('hidden'); }
         function hideImport() { document.getElementById('modal_import').classList.add('hidden'); }
         function parseImport() {
-            const raw = document.getElementById('import_txt').value.trim();
-            if (!raw) return;
-            const lines = raw.split('\n').filter(l => l.trim());
+            const txt = document.getElementById('import_txt').value.trim();
+            if (!txt) return;
+            const lines = txt.split('\n').filter(l => l.trim());
             let currentQ = null;
 
             lines.forEach(line => {
@@ -581,40 +563,6 @@
             if (currentQ) state.exam.questions.push(currentQ);
             renderQuestions();
             hideImport();
-        }
-
-        async function downloadPDF() {
-            const r = window.lastResult;
-            if (!r) return;
-            const pdf = new jspdf.jsPDF();
-            pdf.setFontSize(20);
-            pdf.text("PHIẾU KẾT QUẢ KIỂM TRA", 105, 20, { align: "center" });
-            pdf.setFontSize(12);
-            pdf.text(`Học sinh: ${r.name}`, 20, 40);
-            pdf.text(`Lớp: ${r.class}`, 20, 50);
-            pdf.text(`Mã đề: ${r.code}`, 20, 60);
-            pdf.text(`Điểm trắc nghiệm: ${r.score}`, 20, 70);
-            pdf.text(`Thời gian: ${r.time}`, 20, 80);
-            pdf.text("---------------------------------------", 20, 90);
-            pdf.text("NỘI DUNG TỰ LUẬN:", 20, 100);
-            const splitEssay = pdf.splitTextToSize(r.essay || "(Trống)", 170);
-            pdf.text(splitEssay, 20, 110);
-            pdf.save(`KetQua_${r.name}.pdf`);
-        }
-
-        function exportExcelResults() {
-            const data = state.results.map(r => ({
-                "Họ Tên": r.name,
-                "Lớp": r.class,
-                "Mã Đề": r.code,
-                "Điểm TN": r.score,
-                "Thời Gian": r.time,
-                "Tự Luận": r.essay
-            }));
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "KetQua");
-            XLSX.writeFile(wb, `KetQua_Phong_${state.exam.roomCode}.xlsx`);
         }
     </script>
 </body>
