@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuizPro v2 - Hệ thống thi chuyên nghiệp</title>
+    <title>QuizPro - Hệ thống thi thông minh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -12,474 +12,634 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
         :root { --primary: #6E41E2; --secondary: #2D31FA; --accent: #FFD700; }
-        body { font-family: 'Outfit', sans-serif; background-color: #F0F2F5; }
-        .canva-card { background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); transition: transform 0.2s; }
-        .gradient-btn { background: linear-gradient(135deg, #6E41E2 0%, #2D31FA 100%); color: white; transition: all 0.3s; }
-        .gradient-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(110, 65, 226, 0.4); }
-        .nav-tab.active { background-color: #6E41E2; color: white; box-shadow: 0 4px 10px rgba(110, 65, 226, 0.3); }
-        .option-btn.selected { border-color: #6E41E2; background-color: #F5F3FF; transform: scale(1.02); }
+        body { font-family: 'Outfit', sans-serif; background-color: #F0F2F5; scroll-behavior: smooth; }
+        .canva-card { background: white; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s; }
+        .gradient-btn { background: linear-gradient(135deg, #6E41E2 0%, #2D31FA 100%); color: white; }
+        .gradient-btn:hover { transform: translateY(-2px); shadow: 0 8px 20px rgba(110, 65, 226, 0.3); }
+        .nav-tab.active { background-color: #6E41E2; color: white; box-shadow: 0 4px 15px rgba(110, 65, 226, 0.3); }
+        .option-btn { border: 2px solid #F1F5F9; border-radius: 16px; transition: all 0.2s; cursor: pointer; }
+        .option-btn:hover { border-color: #6E41E2; background-color: #F5F3FF; }
+        .option-btn.selected { border-color: #6E41E2; background-color: #F5F3FF; font-weight: bold; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
     </style>
 </head>
 <body class="text-slate-800">
 
-    <!-- Header -->
-    <header class="bg-white border-b sticky top-0 z-50 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+    <!-- Header Điều hướng -->
+    <header class="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 gradient-btn rounded-xl flex items-center justify-center text-xl shadow-lg">
-                <i class="fas fa-brain"></i>
+                <i class="fas fa-graduation-cap"></i>
             </div>
             <h1 class="text-2xl font-black tracking-tight">Quiz<span class="text-indigo-600">Pro</span></h1>
         </div>
         
-        <div class="flex bg-slate-100 p-1 rounded-xl">
-            <button onclick="changeView('student')" id="tab-student" class="nav-tab active px-5 py-2 rounded-lg text-sm font-bold transition-all">Học sinh</button>
-            <button onclick="changeView('teacher')" id="tab-teacher" class="nav-tab px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-500">Giáo viên</button>
+        <div class="flex bg-slate-100 p-1 rounded-2xl">
+            <button onclick="window.changeView('student')" id="tab-student" class="nav-tab active px-6 py-2 rounded-xl text-sm font-bold transition-all">Học sinh</button>
+            <button onclick="window.changeView('teacher')" id="tab-teacher" class="nav-tab px-6 py-2 rounded-xl text-sm font-bold transition-all text-slate-500">Giáo viên</button>
         </div>
     </header>
 
     <main class="max-w-6xl mx-auto p-4 md:p-8">
 
-        <!-- GIAO DIỆN GIÁO VIÊN -->
-        <div id="teacherView" class="hidden space-y-6">
+        <!-- ================= GIAO DIỆN GIÁO VIÊN ================= -->
+        <div id="teacherView" class="hidden space-y-8">
             <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <h2 class="text-3xl font-black">Bảng điều khiển</h2>
-                <div class="flex gap-2">
-                    <button onclick="switchTeacherTab('quiz')" class="bg-white px-4 py-2 rounded-xl border border-slate-200 font-bold hover:bg-slate-50 transition-all shadow-sm"><i class="fas fa-edit mr-2 text-indigo-500"></i>Đề thi</button>
-                    <button onclick="switchTeacherTab('students')" class="bg-white px-4 py-2 rounded-xl border border-slate-200 font-bold hover:bg-slate-50 transition-all shadow-sm"><i class="fas fa-users mr-2 text-green-500"></i>Học sinh</button>
-                    <button onclick="switchTeacherTab('results')" class="bg-white px-4 py-2 rounded-xl border border-slate-200 font-bold hover:bg-slate-50 transition-all shadow-sm"><i class="fas fa-chart-line mr-2 text-orange-500"></i>Kết quả</button>
+                <div>
+                    <h2 class="text-3xl font-black">Chào thầy/cô! 👋</h2>
+                    <p class="text-slate-400 font-medium">Quản lý đề thi và theo dõi học sinh tại đây.</p>
+                </div>
+                <div class="flex bg-white p-1 rounded-2xl shadow-sm border">
+                    <button onclick="window.switchTeacherTab('quiz')" id="btn-t-quiz" class="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-50 text-indigo-600">Đề thi</button>
+                    <button onclick="window.switchTeacherTab('students')" id="btn-t-students" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-500">Học sinh</button>
+                    <button onclick="window.switchTeacherTab('results')" id="btn-t-results" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-500">Kết quả</button>
                 </div>
             </div>
 
-            <!-- Tab: Đề thi -->
-            <div id="t-quiz" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="canva-card p-6">
-                        <h3 class="font-black text-lg mb-4 flex items-center gap-2">Tạo câu hỏi mới</h3>
-                        <div class="space-y-4">
-                            <textarea id="qText" placeholder="Nội dung câu hỏi..." class="w-full p-4 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-400 outline-none"></textarea>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <input type="text" id="opt0" placeholder="Đáp án A" class="p-3 bg-slate-50 rounded-xl border-none outline-none">
-                                <input type="text" id="opt1" placeholder="Đáp án B" class="p-3 bg-slate-50 rounded-xl border-none outline-none">
-                                <input type="text" id="opt2" placeholder="Đáp án C" class="p-3 bg-slate-50 rounded-xl border-none outline-none">
-                                <input type="text" id="opt3" placeholder="Đáp án D" class="p-3 bg-slate-50 rounded-xl border-none outline-none">
+            <!-- Tab: Quản lý Đề -->
+            <div id="t-quiz" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="canva-card p-6 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-black text-lg">Soạn câu hỏi</h3>
+                            <select id="qType" onchange="window.toggleQType()" class="bg-slate-50 p-2 rounded-lg border-none text-sm font-bold text-indigo-600 outline-none">
+                                <option value="choice">Trắc nghiệm</option>
+                                <option value="essay">Tự luận</option>
+                            </select>
+                        </div>
+                        <textarea id="qText" placeholder="Nhập nội dung câu hỏi..." class="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-400 outline-none min-h-[100px]"></textarea>
+                        
+                        <div id="choiceOptions" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="flex items-center bg-slate-50 rounded-xl px-3">
+                                <span class="font-bold text-slate-400">A</span>
+                                <input type="text" id="opt0" placeholder="Đáp án A" class="w-full p-3 bg-transparent border-none outline-none">
                             </div>
-                            <div class="flex flex-wrap gap-4 items-center">
-                                <select id="correctOpt" class="bg-slate-50 p-3 rounded-xl border-none font-bold text-indigo-600">
-                                    <option value="0">Đúng: A</option>
-                                    <option value="1">Đúng: B</option>
-                                    <option value="2">Đúng: C</option>
-                                    <option value="3">Đúng: D</option>
-                                    <option value="essay">Tự luận</option>
+                            <div class="flex items-center bg-slate-50 rounded-xl px-3">
+                                <span class="font-bold text-slate-400">B</span>
+                                <input type="text" id="opt1" placeholder="Đáp án B" class="w-full p-3 bg-transparent border-none outline-none">
+                            </div>
+                            <div class="flex items-center bg-slate-50 rounded-xl px-3">
+                                <span class="font-bold text-slate-400">C</span>
+                                <input type="text" id="opt2" placeholder="Đáp án C" class="w-full p-3 bg-transparent border-none outline-none">
+                            </div>
+                            <div class="flex items-center bg-slate-50 rounded-xl px-3">
+                                <span class="font-bold text-slate-400">D</span>
+                                <input type="text" id="opt3" placeholder="Đáp án D" class="w-full p-3 bg-transparent border-none outline-none">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="text-xs font-black text-slate-400 uppercase ml-2">Đáp án đúng:</label>
+                                <select id="correctOpt" class="w-full mt-1 p-3 bg-indigo-50 rounded-xl border-none font-bold text-indigo-600 outline-none">
+                                    <option value="0">Câu A</option>
+                                    <option value="1">Câu B</option>
+                                    <option value="2">Câu C</option>
+                                    <option value="3">Câu D</option>
                                 </select>
-                                <button onclick="addQuestion()" class="gradient-btn flex-1 py-3 rounded-xl font-bold">LƯU CÂU HỎI</button>
                             </div>
                         </div>
+                        <button onclick="window.addQuestion()" class="w-full gradient-btn py-4 rounded-2xl font-black shadow-lg">LƯU CÂU HỎI</button>
                     </div>
-                    <div id="questionsList" class="space-y-3"></div>
+
+                    <div id="questionsList" class="space-y-3 custom-scrollbar max-h-[600px] overflow-y-auto pr-2">
+                        <!-- Danh sách câu hỏi render tại đây -->
+                    </div>
                 </div>
-                <div class="space-y-4">
+
+                <div class="space-y-6">
                     <div class="canva-card p-6 space-y-4">
-                        <h3 class="font-black text-lg">Cài đặt phòng</h3>
-                        <input type="text" id="roomCode" placeholder="Mã phòng" class="w-full p-3 bg-slate-50 rounded-xl border-none font-bold">
-                        <input type="number" id="roomTime" placeholder="Thời gian (phút)" class="w-full p-3 bg-slate-50 rounded-xl border-none font-bold">
-                        <button onclick="saveRoomSettings()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">CẬP NHẬT</button>
+                        <h3 class="font-black text-lg flex items-center gap-2"><i class="fas fa-cog text-indigo-500"></i> Cài đặt phòng</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Mã phòng thi</label>
+                                <input type="text" id="roomCode" class="w-full p-3 bg-slate-50 rounded-xl border-none font-bold text-lg">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase">Thời gian (phút)</label>
+                                <input type="number" id="roomTime" class="w-full p-3 bg-slate-50 rounded-xl border-none font-bold text-lg">
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                                <span class="text-sm font-bold">Cho xem kết quả</span>
+                                <input type="checkbox" id="showResultToggle" class="w-5 h-5 accent-indigo-600">
+                            </div>
+                            <button onclick="window.saveRoomSettings()" class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-black transition-all">CẬP NHẬT CÀI ĐẶT</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab: Học sinh -->
+            <!-- Tab: Quản lý Học sinh -->
             <div id="t-students" class="hidden space-y-6">
-                <div class="canva-card p-8 text-center space-y-4 border-2 border-dashed border-slate-200">
-                    <div class="text-4xl text-indigo-400"><i class="fas fa-file-excel"></i></div>
-                    <h3 class="font-black text-xl">Danh sách học sinh</h3>
-                    <p class="text-slate-400 text-sm">Yêu cầu file Excel có cột: <b>Họ tên</b> và <b>Mã HS</b></p>
+                <div class="canva-card p-10 text-center space-y-4 border-2 border-dashed border-indigo-100 bg-indigo-50/30">
+                    <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto text-indigo-500 text-2xl shadow-sm">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-xl">Danh sách học sinh</h3>
+                        <p class="text-slate-500 text-sm">Tải file Excel (.xlsx) để quản lý tên học sinh vào phòng thi.</p>
+                    </div>
                     <input type="file" id="excelFile" class="hidden" accept=".xlsx, .xls">
-                    <button onclick="document.getElementById('excelFile').click()" class="gradient-btn px-8 py-3 rounded-xl font-bold">TẢI FILE EXCEL</button>
+                    <button onclick="document.getElementById('excelFile').click()" class="gradient-btn px-8 py-3 rounded-xl font-bold">CHỌN FILE EXCEL</button>
                 </div>
-                <div id="studentTableContainer" class="canva-card overflow-hidden hidden">
+                <div id="studentTableContainer" class="canva-card overflow-hidden hidden border border-slate-100">
                     <table class="w-full text-left">
                         <thead class="bg-slate-50 border-b">
                             <tr>
                                 <th class="p-4 text-xs font-black uppercase text-slate-400">STT</th>
-                                <th class="p-4 text-xs font-black uppercase text-slate-400">Họ tên</th>
-                                <th class="p-4 text-xs font-black uppercase text-slate-400">Mã HS</th>
+                                <th class="p-4 text-xs font-black uppercase text-slate-400">Họ và tên</th>
+                                <th class="p-4 text-xs font-black uppercase text-slate-400">Mã học sinh</th>
                             </tr>
                         </thead>
-                        <tbody id="studentTableBody"></tbody>
+                        <tbody id="studentTableBody" class="divide-y divide-slate-50"></tbody>
                     </table>
                 </div>
             </div>
 
             <!-- Tab: Kết quả -->
             <div id="t-results" class="hidden space-y-4">
-                <div class="canva-card overflow-hidden">
+                <div class="canva-card overflow-hidden border border-slate-100">
                     <table class="w-full text-left">
                         <thead class="bg-slate-50 border-b">
                             <tr>
                                 <th class="p-4 text-xs font-black uppercase text-slate-400">Học sinh</th>
-                                <th class="p-4 text-xs font-black uppercase text-slate-400">Điểm</th>
+                                <th class="p-4 text-xs font-black uppercase text-slate-400 text-center">Trắc nghiệm</th>
+                                <th class="p-4 text-xs font-black uppercase text-slate-400 text-center">Thời gian nộp</th>
                                 <th class="p-4 text-xs font-black uppercase text-slate-400 text-right">Thao tác</th>
                             </tr>
                         </thead>
-                        <tbody id="resultsTableBody"></tbody>
+                        <tbody id="resultsTableBody" class="divide-y divide-slate-50"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- GIAO DIỆN HỌC SINH -->
-        <div id="studentView" class="max-w-xl mx-auto space-y-6">
+        <!-- ================= GIAO DIỆN HỌC SINH ================= -->
+        <div id="studentView" class="max-w-2xl mx-auto space-y-8 py-10">
+            <!-- Bước 1: Đăng nhập -->
             <div id="st-login" class="canva-card p-10 text-center space-y-8">
-                <div class="w-20 h-20 gradient-btn rounded-3xl mx-auto flex items-center justify-center text-3xl shadow-xl">
-                    <i class="fas fa-user-graduate"></i>
+                <div class="w-24 h-24 gradient-btn rounded-[32px] mx-auto flex items-center justify-center text-4xl shadow-2xl rotate-3">
+                    <i class="fas fa-rocket"></i>
                 </div>
-                <h2 class="text-3xl font-black">Vào phòng thi</h2>
+                <div class="space-y-2">
+                    <h2 class="text-4xl font-black tracking-tight">Chào mừng bạn!</h2>
+                    <p class="text-slate-400 font-medium">Chọn tên của bạn để bắt đầu bài thi.</p>
+                </div>
+                
                 <div class="space-y-4 text-left">
                     <div id="stListContainer" class="hidden space-y-2">
-                        <label class="text-xs font-black text-slate-400 uppercase">Chọn tên từ danh sách:</label>
-                        <select id="stList" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold outline-none"></select>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Danh sách lớp</label>
+                        <select id="stList" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold outline-none focus:ring-2 focus:ring-indigo-400 appearance-none"></select>
                     </div>
                     <div class="space-y-2">
-                        <label class="text-xs font-black text-slate-400 uppercase">Hoặc tự nhập tên:</label>
-                        <input type="text" id="stName" placeholder="Họ và tên..." class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold outline-none">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Hoặc nhập tên tự do</label>
+                        <input type="text" id="stName" placeholder="Tên của bạn là gì?" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold outline-none focus:ring-2 focus:ring-indigo-400 text-center">
                     </div>
                 </div>
-                <button onclick="enterExam()" class="w-full gradient-btn py-4 rounded-2xl text-xl font-black">BẮT ĐẦU THI</button>
+                
+                <button onclick="window.enterExam()" class="w-full gradient-btn py-5 rounded-3xl text-xl font-black shadow-xl">VÀO PHÒNG THI</button>
             </div>
 
-            <div id="st-exam" class="hidden space-y-4">
-                <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
-                    <span id="stTimer" class="font-mono text-xl font-black text-indigo-600">00:00</span>
-                    <span class="font-bold text-slate-400">Câu <span id="curQIdx">1</span>/<span id="totalQ">0</span></span>
-                </div>
-                <div class="canva-card p-8 min-h-[300px] space-y-6">
-                    <h2 id="qTitle" class="text-xl font-black text-slate-800">---</h2>
-                    <div id="choiceContainer" class="grid gap-3"></div>
-                    <div id="essayContainer" class="hidden">
-                        <textarea id="stEssayAns" placeholder="Nhập câu trả lời tự luận..." class="w-full h-40 p-4 bg-slate-50 rounded-2xl border-none outline-none"></textarea>
+            <!-- Bước 2: Làm bài -->
+            <div id="st-exam" class="hidden space-y-6">
+                <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <span id="stTimer" class="font-mono text-2xl font-black text-indigo-600">00:00</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] font-black text-slate-400 uppercase">Tiến độ</p>
+                        <p class="font-bold">Câu <span id="curQIdxDisplay">1</span>/<span id="totalQ">0</span></p>
                     </div>
                 </div>
+
+                <div class="canva-card p-8 min-h-[350px] space-y-8">
+                    <div id="questionContainer" class="space-y-6">
+                        <h2 id="stQuestionText" class="text-2xl font-bold leading-tight text-slate-800">Đang tải câu hỏi...</h2>
+                        <div id="choiceArea" class="grid gap-3"></div>
+                        <div id="essayArea" class="hidden">
+                            <textarea id="stEssayAns" placeholder="Viết câu trả lời của bạn tại đây..." class="w-full h-48 p-5 bg-slate-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-400 font-medium"></textarea>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex gap-4">
-                    <button onclick="prevQuestion()" class="bg-white flex-1 py-4 rounded-2xl font-bold">QUAY LẠI</button>
-                    <button id="nextBtn" onclick="nextQuestion()" class="gradient-btn flex-1 py-4 rounded-2xl font-bold">TIẾP THEO</button>
+                    <button onclick="window.prevQuestion()" class="bg-white flex-1 py-5 rounded-3xl font-black border-2 border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-500 transition-all">TRƯỚC</button>
+                    <button id="nextBtn" onclick="window.nextQuestion()" class="gradient-btn flex-1 py-5 rounded-3xl font-black shadow-xl">TIẾP THEO</button>
                 </div>
             </div>
 
-            <div id="st-result" class="hidden canva-card p-12 text-center space-y-6">
-                <div class="text-5xl text-green-500"><i class="fas fa-check-circle"></i></div>
-                <h2 class="text-3xl font-black">Hoàn thành!</h2>
-                <div id="finalScoreDisplay" class="p-6 bg-indigo-50 rounded-3xl border-2 border-indigo-100">
-                    <p class="text-6xl font-black text-indigo-600"><span id="stScore">0</span></p>
-                    <p class="text-slate-400 font-bold uppercase mt-2">Điểm trắc nghiệm</p>
+            <!-- Bước 3: Kết quả -->
+            <div id="st-result" class="hidden canva-card p-12 text-center space-y-8 animate-bounce-in">
+                <div class="text-7xl text-green-500"><i class="fas fa-check-circle"></i></div>
+                <div class="space-y-2">
+                    <h2 class="text-4xl font-black">Nộp bài thành công!</h2>
+                    <p class="text-slate-400 font-medium">Chúc mừng bạn đã hoàn thành bài thi.</p>
                 </div>
-                <button onclick="location.reload()" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold">VỀ TRANG CHỦ</button>
+                
+                <div id="stFinalScoreBlock" class="hidden p-8 bg-indigo-50 rounded-[40px] border-4 border-white shadow-inner">
+                    <p class="text-[12px] font-black text-indigo-400 uppercase tracking-widest">Điểm của bạn</p>
+                    <p class="text-8xl font-black text-indigo-600 my-2"><span id="finalScore">0</span></p>
+                    <p class="text-indigo-400 font-bold" id="finalDetail">0/0 câu trắc nghiệm đúng</p>
+                </div>
+
+                <button onclick="location.reload()" class="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-lg">VỀ TRANG CHỦ</button>
             </div>
         </div>
     </main>
 
+    <!-- Modal Xem kết quả chi tiết -->
+    <div id="resultModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-[32px] max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="p-6 border-b flex justify-between items-center bg-slate-50">
+                <h3 class="font-black text-xl" id="modalTitle">Chi tiết bài làm</h3>
+                <button onclick="window.closeModal()" class="w-10 h-10 rounded-full hover:bg-slate-200 transition-all"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="modalContent" class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6"></div>
+            <div class="p-6 border-t bg-slate-50 flex gap-3">
+                <button id="btnExportPDF" class="flex-1 gradient-btn py-3 rounded-xl font-bold">XUẤT PDF</button>
+                <button onclick="window.closeModal()" class="flex-1 bg-white py-3 rounded-xl font-bold border">ĐÓNG</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, collection, setDoc, addDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, setDoc, addDoc, onSnapshot, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // Cấu hình Firebase từ User
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvV6kYG8RTg_07_GasKabW7V-TMySZ8F8",
+            authDomain: "game-44f7b.firebaseapp.com",
+            projectId: "game-44f7b",
+            storageBucket: "game-44f7b.firebasestorage.app",
+            messagingSenderId: "1019024917096",
+            appId: "1:1019024917096:web:84c195229e31be7f8631dd",
+            measurementId: "G-0C3LEDLLRG"
+        };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'quiz-default';
+        const appId = "quizpro_v3"; // Định danh ứng dụng của bạn
 
+        // Biến trạng thái
         let currentUser = null;
         let questions = [];
-        let roomSettings = { code: '123456', duration: 15 };
-        let studentAnswers = [];
-        let curQIdx = 0;
-        let timerInterval = null;
+        let roomSettings = { code: '123456', duration: 15, showResult: true };
         let studentList = [];
+        let curQIdx = 0;
+        let myAnswers = [];
+        let timer = null;
 
-        // --- GÁN CÁC HÀM VÀO WINDOW ĐỂ HOẠT ĐỘNG TRONG MODULE ---
+        // --- GÁN CÁC HÀM VÀO WINDOW ĐỂ GỌI TỪ HTML ---
+        
         window.changeView = (role) => {
-            const tabs = document.querySelectorAll('.nav-tab');
-            tabs.forEach(t => {
-                t.classList.remove('active');
-                t.classList.add('text-slate-500');
-            });
-            const activeTab = document.getElementById(`tab-${role}`);
-            if(activeTab) {
-                activeTab.classList.add('active');
-                activeTab.classList.remove('text-slate-500');
-            }
+            document.getElementById('tab-student').classList.toggle('active', role === 'student');
+            document.getElementById('tab-teacher').classList.toggle('active', role === 'teacher');
             document.getElementById('teacherView').classList.toggle('hidden', role !== 'teacher');
             document.getElementById('studentView').classList.toggle('hidden', role !== 'student');
         };
 
         window.switchTeacherTab = (tab) => {
             ['quiz', 'students', 'results'].forEach(t => {
-                const el = document.getElementById(`t-${t}`);
-                if(el) el.classList.toggle('hidden', t !== tab);
+                const view = document.getElementById(`t-${t}`);
+                const btn = document.getElementById(`btn-t-${t}`);
+                if(view) view.classList.toggle('hidden', t !== tab);
+                if(btn) {
+                    btn.classList.toggle('bg-indigo-50', t === tab);
+                    btn.classList.toggle('text-indigo-600', t === tab);
+                    btn.classList.toggle('text-slate-500', t !== tab);
+                }
             });
         };
 
+        window.toggleQType = () => {
+            const type = document.getElementById('qType').value;
+            document.getElementById('choiceOptions').classList.toggle('hidden', type === 'essay');
+        };
+
         window.addQuestion = async () => {
-            if(!currentUser) return;
             const text = document.getElementById('qText').value;
-            const correct = document.getElementById('correctOpt').value;
-            if(!text) return;
+            const type = document.getElementById('qType').value;
+            if(!text) return alert("Vui lòng nhập nội dung câu hỏi!");
 
             const q = {
                 text,
-                type: correct === 'essay' ? 'essay' : 'choice',
-                correct: correct === 'essay' ? null : parseInt(correct),
-                options: [
+                type,
+                correct: type === 'choice' ? parseInt(document.getElementById('correctOpt').value) : null,
+                options: type === 'choice' ? [
                     document.getElementById('opt0').value || "A",
                     document.getElementById('opt1').value || "B",
                     document.getElementById('opt2').value || "C",
                     document.getElementById('opt3').value || "D"
-                ],
+                ] : [],
                 createdAt: Date.now()
             };
+
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), q);
             document.getElementById('qText').value = "";
         };
 
         window.deleteQuestion = async (id) => {
-            if(!currentUser) return;
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questions', id));
+            if(confirm("Xóa câu hỏi này?")) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questions', id));
+            }
         };
 
         window.saveRoomSettings = async () => {
-            if(!currentUser) return;
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'general'), {
+            const data = {
                 code: document.getElementById('roomCode').value,
-                duration: parseInt(document.getElementById('roomTime').value)
-            });
-            alert("Đã lưu cài đặt!");
+                duration: parseInt(document.getElementById('roomTime').value),
+                showResult: document.getElementById('showResultToggle').checked
+            };
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'general'), data);
+            alert("Đã cập nhật cài đặt!");
         };
 
-        window.selectAnswer = (idx) => {
-            studentAnswers[curQIdx].answer = idx;
-            renderQuizPage();
+        window.enterExam = () => {
+            const name = document.getElementById('stList').value || document.getElementById('stName').value;
+            if(!name) return alert("Vui lòng chọn hoặc nhập tên!");
+            if(questions.length === 0) return alert("Phòng thi chưa có câu hỏi nào!");
+
+            document.getElementById('st-login').classList.add('hidden');
+            document.getElementById('st-exam').classList.remove('hidden');
+            
+            myAnswers = questions.map(q => ({ qid: q.id, type: q.type, answer: q.type === 'choice' ? null : "" }));
+            document.getElementById('totalQ').innerText = questions.length;
+            
+            startTimer();
+            renderStudentQuestion();
+        };
+
+        window.selectChoice = (idx) => {
+            myAnswers[curQIdx].answer = idx;
+            renderStudentQuestion();
         };
 
         window.nextQuestion = () => {
             if(curQIdx < questions.length - 1) {
                 curQIdx++;
-                renderQuizPage();
+                renderStudentQuestion();
             } else {
-                if(confirm("Nộp bài?")) submitQuiz();
+                if(confirm("Bạn có chắc muốn nộp bài không?")) submitExam();
             }
         };
 
-        window.prevQuestion = () => { if(curQIdx > 0) { curQIdx--; renderQuizPage(); } };
-
-        window.enterExam = () => {
-            const name = document.getElementById('stList').value || document.getElementById('stName').value;
-            if(!name) return alert("Vui lòng chọn hoặc nhập tên!");
-            if(questions.length === 0) return alert("Chưa có đề thi!");
-
-            document.getElementById('st-login').classList.add('hidden');
-            document.getElementById('st-exam').classList.remove('hidden');
-            studentAnswers = questions.map(q => ({qid: q.id, answer: q.type === 'essay' ? "" : null}));
-            
-            let time = roomSettings.duration * 60;
-            timerInterval = setInterval(() => {
-                time--;
-                let m = Math.floor(time / 60);
-                let s = time % 60;
-                const display = document.getElementById('stTimer');
-                if(display) display.innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-                if(time <= 0) submitQuiz();
-            }, 1000);
-            renderQuizPage();
+        window.prevQuestion = () => {
+            if(curQIdx > 0) {
+                curQIdx--;
+                renderStudentQuestion();
+            }
         };
 
-        // KHỞI TẠO AUTH
-        window.onload = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+        window.closeModal = () => document.getElementById('resultModal').classList.add('hidden');
+
+        // --- HÀM XỬ LÝ NỘI BỘ ---
+
+        function startTimer() {
+            let seconds = roomSettings.duration * 60;
+            timer = setInterval(() => {
+                seconds--;
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                document.getElementById('stTimer').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if(seconds <= 0) {
+                    clearInterval(timer);
+                    submitExam();
                 }
-            } catch (error) {
-                console.error("Auth error:", error);
+            }, 1000);
+        }
+
+        function renderStudentQuestion() {
+            const q = questions[curQIdx];
+            document.getElementById('curQIdxDisplay').innerText = curQIdx + 1;
+            document.getElementById('stQuestionText').innerText = q.text;
+            
+            const choiceArea = document.getElementById('choiceArea');
+            const essayArea = document.getElementById('essayArea');
+            const nextBtn = document.getElementById('nextBtn');
+
+            if(q.type === 'choice') {
+                choiceArea.classList.remove('hidden');
+                essayArea.classList.add('hidden');
+                choiceArea.innerHTML = q.options.map((opt, i) => `
+                    <div onclick="window.selectChoice(${i})" class="option-btn p-4 flex items-center gap-4 ${myAnswers[curQIdx].answer === i ? 'selected' : ''}">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center font-black ${myAnswers[curQIdx].answer === i ? 'gradient-btn' : 'bg-slate-100'}">
+                            ${String.fromCharCode(65 + i)}
+                        </div>
+                        <span class="font-medium">${opt}</span>
+                    </div>
+                `).join('');
+            } else {
+                choiceArea.classList.add('hidden');
+                essayArea.classList.remove('hidden');
+                const textarea = document.getElementById('stEssayAns');
+                textarea.value = myAnswers[curQIdx].answer;
+                textarea.oninput = (e) => myAnswers[curQIdx].answer = e.target.value;
             }
 
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUser = user;
-                    setupListeners();
+            nextBtn.innerText = (curQIdx === questions.length - 1) ? "NỘP BÀI" : "TIẾP THEO";
+        }
+
+        async function submitExam() {
+            clearInterval(timer);
+            let score = 0;
+            let totalChoice = 0;
+
+            questions.forEach((q, i) => {
+                if(q.type === 'choice') {
+                    totalChoice++;
+                    if(myAnswers[i].answer === q.correct) score++;
                 }
             });
+
+            const submission = {
+                studentName: document.getElementById('stList').value || document.getElementById('stName').value,
+                answers: myAnswers,
+                score,
+                totalChoice,
+                timestamp: Date.now()
+            };
+
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'results'), submission);
+            
+            document.getElementById('st-exam').classList.add('hidden');
+            document.getElementById('st-result').classList.remove('hidden');
+
+            if(roomSettings.showResult) {
+                document.getElementById('stFinalScoreBlock').classList.remove('hidden');
+                document.getElementById('finalScore').innerText = score;
+                document.getElementById('finalDetail').innerText = `${score}/${totalChoice} câu trắc nghiệm đúng`;
+            }
+        }
+
+        // --- EXCEL & PDF ---
+
+        document.getElementById('excelFile').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', 'list'), { data });
+                alert("Đã tải danh sách học sinh!");
+            };
+            reader.readAsBinaryString(file);
         };
 
-        function setupListeners() {
-            if (!currentUser) return;
+        window.viewResultDetail = (id) => {
+            const result = allResults.find(r => r.id === id);
+            if(!result) return;
+            
+            const modal = document.getElementById('resultModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            document.getElementById('modalTitle').innerText = `Bài làm của: ${result.studentName}`;
 
+            content.innerHTML = questions.map((q, i) => {
+                const stAns = result.answers[i]?.answer;
+                const isCorrect = q.type === 'choice' ? stAns === q.correct : 'Tự luận';
+                const colorClass = q.type === 'choice' ? (isCorrect ? 'text-green-600' : 'text-red-600') : 'text-indigo-600';
+                
+                return `
+                    <div class="p-4 bg-slate-50 rounded-2xl space-y-2 border">
+                        <div class="flex justify-between font-bold">
+                            <span>Câu ${i+1}: ${q.text}</span>
+                            <span class="${colorClass}">${q.type === 'choice' ? (isCorrect ? 'ĐÚNG' : 'SAI') : 'TỰ LUẬN'}</span>
+                        </div>
+                        <div class="text-sm text-slate-500">
+                            <b>Trả lời:</b> ${q.type === 'choice' ? (q.options[stAns] || 'Chưa chọn') : stAns}
+                        </div>
+                        ${q.type === 'choice' ? `<div class="text-sm text-green-600"><b>Đáp án đúng:</b> ${q.options[q.correct]}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('btnExportPDF').onclick = () => exportToPDF(result);
+        };
+
+        function exportToPDF(result) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(20);
+            doc.text("KET QUA BAI THI ONLINE", 105, 20, { align: 'center' });
+            
+            doc.setFontSize(12);
+            doc.text(`Hoc sinh: ${result.studentName}`, 20, 35);
+            doc.text(`Diem trac nghiem: ${result.score}/${result.totalChoice}`, 20, 42);
+            doc.text(`Ngay thi: ${new Date(result.timestamp).toLocaleString()}`, 20, 49);
+
+            const tableData = questions.map((q, i) => [
+                `Cau ${i+1}`,
+                q.text,
+                q.type === 'choice' ? q.options[result.answers[i]?.answer] || 'Empty' : result.answers[i]?.answer,
+                q.type === 'choice' ? (result.answers[i]?.answer === q.correct ? 'Dung' : 'Sai') : 'Tu luan'
+            ]);
+
+            doc.autoTable({
+                startY: 60,
+                head: [['STT', 'Cau hoi', 'Tra loi', 'Ket qua']],
+                body: tableData,
+            });
+
+            doc.save(`Result_${result.studentName}.pdf`);
+        }
+
+        // --- KHỞI TẠO & LISTENERS ---
+        let allResults = [];
+
+        async function init() {
+            await signInAnonymously(auth);
+            
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), (snap) => {
                 questions = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.createdAt - b.createdAt);
                 renderQuestionsList();
-                const totalQ = document.getElementById('totalQ');
-                if(totalQ) totalQ.innerText = questions.length;
             });
 
             onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'general'), (snap) => {
                 if(snap.exists()) {
                     roomSettings = snap.data();
-                    const codeEl = document.getElementById('roomCode');
-                    const timeEl = document.getElementById('roomTime');
-                    if(codeEl) codeEl.value = roomSettings.code || '123456';
-                    if(timeEl) timeEl.value = roomSettings.duration || 15;
+                    document.getElementById('roomCode').value = roomSettings.code;
+                    document.getElementById('roomTime').value = roomSettings.duration;
+                    document.getElementById('showResultToggle').checked = roomSettings.showResult;
                 }
             });
 
             onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'students', 'list'), (snap) => {
                 if(snap.exists()) {
-                    studentList = snap.data().data || [];
-                    renderStudentTable();
+                    studentList = snap.data().data;
+                    renderStudentTab();
                     renderStudentDropdown();
                 }
             });
 
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'results'), (snap) => {
-                renderResultsTable(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                allResults = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderResultsTab();
             });
         }
 
         function renderQuestionsList() {
             const list = document.getElementById('questionsList');
-            if(!list) return;
             list.innerHTML = questions.map((q, i) => `
-                <div class="canva-card p-4 flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-indigo-600">#${i+1}</span>
-                        <span class="text-sm font-medium">${q.text}</span>
+                <div class="canva-card p-4 flex justify-between items-center group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xs">${i+1}</div>
+                        <div>
+                            <p class="font-bold text-sm">${q.text}</p>
+                            <p class="text-[10px] uppercase font-black tracking-wider ${q.type === 'choice' ? 'text-indigo-500' : 'text-orange-500'}">${q.type === 'choice' ? 'Trắc nghiệm' : 'Tự luận'}</p>
+                        </div>
                     </div>
-                    <button onclick="deleteQuestion('${q.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
+                    <button onclick="window.deleteQuestion('${q.id}')" class="w-8 h-8 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
                 </div>
             `).join('');
         }
 
-        const excelFile = document.getElementById('excelFile');
-        if(excelFile) {
-            excelFile.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if(!file) return;
-                const reader = new FileReader();
-                reader.onload = async (evt) => {
-                    try {
-                        const bstr = evt.target.result;
-                        const wb = XLSX.read(bstr, {type:'binary'});
-                        const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', 'list'), { data });
-                        alert(`Import thành công ${data.length} học sinh!`);
-                        e.target.value = "";
-                    } catch (err) {
-                        alert("Lỗi đọc file Excel.");
-                    }
-                };
-                reader.readAsBinaryString(file);
-            });
-        }
-
-        function renderStudentTable() {
+        function renderStudentTab() {
             const container = document.getElementById('studentTableContainer');
             const tbody = document.getElementById('studentTableBody');
-            if(!container || !tbody) return;
             if(studentList.length > 0) {
                 container.classList.remove('hidden');
                 tbody.innerHTML = studentList.map((s, i) => `
-                    <tr class="border-b border-slate-50">
-                        <td class="p-4 text-sm font-bold text-slate-400">${i+1}</td>
-                        <td class="p-4 text-sm font-bold text-slate-700">${s['Họ tên'] || 'N/A'}</td>
-                        <td class="p-4 text-sm text-slate-500">${s['Mã HS'] || 'N/A'}</td>
+                    <tr>
+                        <td class="p-4 text-xs font-bold text-slate-400">${i+1}</td>
+                        <td class="p-4 text-sm font-bold">${s['Họ và tên'] || s['Họ tên'] || 'N/A'}</td>
+                        <td class="p-4 text-sm text-slate-500">${s['Mã học sinh'] || s['Mã HS'] || 'N/A'}</td>
                     </tr>
                 `).join('');
-            } else {
-                container.classList.add('hidden');
             }
         }
 
-        function renderResultsTable(results) {
+        function renderStudentDropdown() {
+            const sel = document.getElementById('stList');
+            if(studentList.length > 0) {
+                document.getElementById('stListContainer').classList.remove('hidden');
+                sel.innerHTML = `<option value="">-- Chọn tên của bạn --</option>` + 
+                    studentList.map(s => `<option value="${s['Họ và tên'] || s['Họ tên']}">${s['Họ và tên'] || s['Họ tên']}</option>`).join('');
+            }
+        }
+
+        function renderResultsTab() {
             const tbody = document.getElementById('resultsTableBody');
-            if(!tbody) return;
-            tbody.innerHTML = results.map(r => `
-                <tr class="border-b">
-                    <td class="p-4 font-bold">${r.studentName}</td>
-                    <td class="p-4"><span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">${r.score}/${r.total}</span></td>
+            tbody.innerHTML = allResults.map(r => `
+                <tr>
+                    <td class="p-4 font-bold text-slate-700">${r.studentName}</td>
+                    <td class="p-4 text-center"><span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">${r.score}/${r.totalChoice}</span></td>
+                    <td class="p-4 text-center text-xs text-slate-400 font-medium">${new Date(r.timestamp).toLocaleTimeString()}</td>
                     <td class="p-4 text-right">
-                        <button class="text-indigo-500"><i class="fas fa-file-pdf"></i></button>
+                        <button onclick="window.viewResultDetail('${r.id}')" class="text-indigo-600 hover:underline text-sm font-bold">Xem bài làm</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        function renderStudentDropdown() {
-            const sel = document.getElementById('stList');
-            const container = document.getElementById('stListContainer');
-            if(!sel || !container) return;
-            if(studentList.length > 0) {
-                container.classList.remove('hidden');
-                sel.innerHTML = `<option value="">-- Chọn tên từ danh sách --</option>` + 
-                    studentList.map(s => `<option value="${s['Họ tên']}">${s['Họ tên']} - ${s['Mã HS'] || ''}</option>`).join('');
-            }
-        }
-
-        function renderQuizPage() {
-            const q = questions[curQIdx];
-            const curEl = document.getElementById('curQIdx');
-            const titleEl = document.getElementById('qTitle');
-            if(curEl) curEl.innerText = curQIdx + 1;
-            if(titleEl) titleEl.innerText = q.text;
-
-            const choices = document.getElementById('choiceContainer');
-            const essay = document.getElementById('essayContainer');
-
-            if(q.type === 'choice') {
-                choices.classList.remove('hidden');
-                essay.classList.add('hidden');
-                choices.innerHTML = q.options.map((opt, i) => `
-                    <button onclick="selectAnswer(${i})" class="option-btn p-4 rounded-xl border-2 text-left flex items-center gap-3 transition-all ${studentAnswers[curQIdx].answer === i ? 'border-indigo-600 bg-indigo-50 font-bold' : 'border-slate-100'}">
-                        <span class="w-8 h-8 rounded-full border flex items-center justify-center text-xs ${studentAnswers[curQIdx].answer === i ? 'bg-indigo-600 text-white' : ''}">${String.fromCharCode(65+i)}</span>
-                        ${opt}
-                    </button>
-                `).join('');
-            } else {
-                choices.classList.add('hidden');
-                essay.classList.remove('hidden');
-                const area = document.getElementById('stEssayAns');
-                if(area) {
-                    area.value = studentAnswers[curQIdx].answer || "";
-                    area.oninput = (e) => { studentAnswers[curQIdx].answer = e.target.value; };
-                }
-            }
-            const nextBtn = document.getElementById('nextBtn');
-            if(nextBtn) nextBtn.innerText = curQIdx === questions.length - 1 ? "NỘP BÀI" : "TIẾP THEO";
-        }
-
-        async function submitQuiz() {
-            if(!currentUser) return;
-            clearInterval(timerInterval);
-            let score = 0;
-            let total = 0;
-            questions.forEach((q, i) => {
-                if(q.type === 'choice') {
-                    total++;
-                    if(studentAnswers[i].answer === q.correct) score++;
-                }
-            });
-
-            const result = {
-                studentName: document.getElementById('stList').value || document.getElementById('stName').value,
-                score,
-                total,
-                answers: studentAnswers,
-                timestamp: Date.now()
-            };
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'results'), result);
-            document.getElementById('st-exam').classList.add('hidden');
-            document.getElementById('st-result').classList.remove('hidden');
-            document.getElementById('stScore').innerText = `${score}/${total}`;
-        }
+        init();
     </script>
 </body>
 </html>
