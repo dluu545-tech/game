@@ -3,175 +3,302 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Todo App</title>
-    <!-- Tailwind CSS qua CDN để giao diện đẹp mà không cần cài đặt -->
+    <title>QuizPro - Hệ thống Thi Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
         
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
 
-        .todo-item {
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .option-card {
             transition: all 0.2s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
         }
 
-        .todo-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        .option-card:hover {
+            border-color: #667eea;
+            background-color: #f8faff;
         }
 
-        /* Tùy chỉnh thanh cuộn cho desktop */
-        ::-webkit-scrollbar {
-            width: 6px;
+        .option-card.selected {
+            border-color: #764ba2;
+            background-color: #f3f0ff;
+            font-weight: 600;
         }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
+
+        .gradient-text {
+            background: linear-gradient(to right, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
+<body class="p-4 md:p-8">
 
-    <div class="max-w-2xl mx-auto">
-        <!-- Header -->
-        <header class="mb-8 text-center">
-            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-2">My Tasks</h1>
-            <p class="text-slate-500">Quản lý công việc hiệu quả trên mọi thiết bị</p>
-        </header>
-
-        <!-- Input Section -->
-        <div class="bg-white p-4 rounded-2xl shadow-sm mb-6 flex flex-col sm:flex-row gap-3">
-            <input type="text" id="taskInput" 
-                   placeholder="Thêm công việc mới..." 
-                   class="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700">
-            <button onclick="addTask()" 
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2">
-                <i class="fas fa-plus"></i> Thêm
+    <div class="max-w-4xl mx-auto">
+        <!-- Auth / Login View -->
+        <div id="authView" class="glass-card rounded-3xl p-8 shadow-2xl text-center max-w-md mx-auto mt-20">
+            <h1 class="text-4xl font-bold gradient-text mb-6">QuizPro</h1>
+            <p class="text-slate-600 mb-8">Nhập tên của bạn để bắt đầu bài thi</p>
+            <input type="text" id="userName" placeholder="Họ và tên của bạn..." 
+                   class="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4 text-center text-lg">
+            <button onclick="startApp()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:opacity-90 transition-all">
+                VÀO THI NGAY
             </button>
         </div>
 
-        <!-- Filter & Stats -->
-        <div class="flex items-center justify-between mb-6 px-2 text-sm text-slate-500 font-medium">
-            <span id="taskCount">0 công việc</span>
-            <button onclick="clearAll()" class="hover:text-red-500 transition-colors">Xóa tất cả</button>
-        </div>
-
-        <!-- Task List -->
-        <div id="taskList" class="space-y-3">
-            <!-- Tasks will be rendered here -->
-        </div>
-
-        <!-- Empty State -->
-        <div id="emptyState" class="hidden text-center py-20">
-            <div class="text-slate-300 mb-4">
-                <i class="fas fa-clipboard-list text-6xl"></i>
+        <!-- Quiz View -->
+        <div id="quizView" class="hidden glass-card rounded-3xl p-6 md:p-10 shadow-2xl">
+            <div class="flex justify-between items-center mb-8">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold" id="userInitial">A</div>
+                    <div>
+                        <p class="text-sm text-slate-500">Thí sinh</p>
+                        <p class="font-bold text-slate-800" id="displayUserName">Nguyễn Văn A</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-slate-500">Câu hỏi</p>
+                    <p class="font-bold text-slate-800"><span id="currentQuestionNum">1</span> / <span id="totalQuestionsNum">10</span></p>
+                </div>
             </div>
-            <p class="text-slate-500 italic">Chưa có công việc nào. Hãy bắt đầu ngay!</p>
+
+            <!-- Question Area -->
+            <div id="questionContainer" class="mb-10">
+                <h2 id="questionText" class="text-2xl font-bold text-slate-800 mb-6 leading-tight">
+                    Đang tải câu hỏi...
+                </h2>
+                <div id="optionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Options generated by JS -->
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button onclick="prevQuestion()" id="prevBtn" class="px-8 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-all invisible">Quay lại</button>
+                <button onclick="nextQuestion()" id="nextBtn" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all">Câu tiếp theo</button>
+            </div>
+        </div>
+
+        <!-- Result View -->
+        <div id="resultView" class="hidden glass-card rounded-3xl p-10 shadow-2xl text-center">
+            <div class="mb-6">
+                <i class="fas fa-trophy text-yellow-400 text-7xl mb-4"></i>
+                <h2 class="text-3xl font-bold text-slate-800">Hoàn thành bài thi!</h2>
+            </div>
+            <div class="bg-slate-50 rounded-3xl p-8 mb-8">
+                <p class="text-slate-500 uppercase tracking-widest text-sm font-bold mb-2">Điểm số của bạn</p>
+                <p class="text-6xl font-black gradient-text" id="finalScore">0/10</p>
+            </div>
+            
+            <div class="mb-8 overflow-hidden rounded-2xl border border-slate-100">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-100 text-slate-600 text-xs uppercase font-bold">
+                        <tr>
+                            <th class="px-6 py-3">Hạng</th>
+                            <th class="px-6 py-3">Học sinh</th>
+                            <th class="px-6 py-3 text-right">Điểm</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody" class="text-slate-700">
+                        <!-- Leaderboard data -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="location.reload()" class="bg-slate-800 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-900 transition-all">THI LẠI</button>
         </div>
     </div>
 
-    <script>
-        // State management
-        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Elements
-        const taskInput = document.getElementById('taskInput');
-        const taskList = document.getElementById('taskList');
-        const taskCount = document.getElementById('taskCount');
-        const emptyState = document.getElementById('emptyState');
+        // Khởi tạo cấu hình từ biến môi trường
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyAvV6kYG8RTg_07_GasKabW7V-TMySZ8F8",
+            authDomain: "game-44f7b.firebaseapp.com",
+            projectId: "game-44f7b",
+            storageBucket: "game-44f7b.firebasestorage.app",
+            messagingSenderId: "1019024917096",
+            appId: "1:1019024917096:web:84c195229e31be7f8631dd",
 
-        // Khởi tạo ứng dụng
-        window.onload = () => {
-            renderTasks();
-            
-            // Xử lý phím Enter
-            taskInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') addTask();
-            });
         };
 
-        // Lưu vào LocalStorage
-        function saveTasks() {
-            localStorage.setItem('tasks', JSON.stringify(tasks));
-            renderTasks();
-        }
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'quiz-pro-v1';
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
 
-        // Thêm công việc
-        function addTask() {
-            const text = taskInput.value.trim();
-            if (!text) return;
+        let user = null;
 
-            const newTask = {
-                id: Date.now(),
-                text: text,
-                completed: false,
-                createdAt: new Date().toLocaleDateString('vi-VN')
-            };
+        // Xử lý Authentication theo quy tắc bắt buộc
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+            }
+        };
 
-            tasks.unshift(newTask); // Thêm vào đầu danh sách
-            taskInput.value = '';
-            saveTasks();
-        }
+        onAuthStateChanged(auth, (u) => {
+            user = u;
+            if (user && document.getElementById('resultView').classList.contains('hidden') === false) {
+                loadLeaderboard();
+            }
+        });
 
-        // Xóa công việc
-        function deleteTask(id) {
-            tasks = tasks.filter(t => t.id !== id);
-            saveTasks();
-        }
+        // Gọi khởi tạo Auth ngay lập tức
+        initAuth();
 
-        // Đánh dấu hoàn thành
-        function toggleTask(id) {
-            tasks = tasks.map(t => {
-                if (t.id === id) return { ...t, completed: !t.completed };
-                return t;
+        const questions = [
+            { q: "Thủ đô của Việt Nam là gì?", a: ["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Huế"], correct: 0 },
+            { q: "Phần mềm nào sau đây dùng để duyệt web?", a: ["Word", "Excel", "Google Chrome", "Photoshop"], correct: 2 },
+            { q: "1 + 1 bằng mấy?", a: ["1", "2", "3", "4"], correct: 1 },
+            { q: "Ngôn ngữ nào dùng để tạo cấu trúc trang web?", a: ["Python", "C++", "HTML", "Java"], correct: 2 }
+        ];
+
+        let currentQuestion = 0;
+        let userAnswers = Array(questions.length).fill(null);
+        let userName = "";
+
+        window.startApp = async () => {
+            const input = document.getElementById('userName');
+            if (!input.value.trim()) return alert("Vui lòng nhập tên!");
+            
+            userName = input.value.trim();
+            document.getElementById('displayUserName').innerText = userName;
+            document.getElementById('userInitial').innerText = userName.charAt(0).toUpperCase();
+            
+            document.getElementById('authView').classList.add('hidden');
+            document.getElementById('quizView').classList.remove('hidden');
+            
+            showQuestion();
+        };
+
+        window.showQuestion = () => {
+            const q = questions[currentQuestion];
+            document.getElementById('currentQuestionNum').innerText = currentQuestion + 1;
+            document.getElementById('totalQuestionsNum').innerText = questions.length;
+            document.getElementById('questionText').innerText = q.q;
+            
+            const grid = document.getElementById('optionsGrid');
+            grid.innerHTML = '';
+            
+            q.a.forEach((opt, index) => {
+                const btn = document.createElement('div');
+                btn.className = `option-card p-5 rounded-2xl border-2 flex items-center gap-4 bg-white shadow-sm ${userAnswers[currentQuestion] === index ? 'selected' : 'border-slate-100'}`;
+                btn.innerHTML = `
+                    <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm ${userAnswers[currentQuestion] === index ? 'bg-purple-600 text-white border-purple-600' : 'border-slate-200 text-slate-400'}">
+                        ${String.fromCharCode(65 + index)}
+                    </div>
+                    <span class="text-slate-700">${opt}</span>
+                `;
+                btn.onclick = () => selectOption(index);
+                grid.appendChild(btn);
             });
-            saveTasks();
-        }
 
-        // Xóa sạch danh sách
-        function clearAll() {
-            if (confirm('Bạn có chắc chắn muốn xóa tất cả công việc?')) {
-                tasks = [];
-                saveTasks();
+            document.getElementById('prevBtn').style.visibility = currentQuestion > 0 ? 'visible' : 'hidden';
+            document.getElementById('nextBtn').innerText = currentQuestion === questions.length - 1 ? 'NỘP BÀI' : 'Câu tiếp theo';
+        };
+
+        window.selectOption = (index) => {
+            userAnswers[currentQuestion] = index;
+            showQuestion();
+        };
+
+        window.nextQuestion = () => {
+            if (userAnswers[currentQuestion] === null) return alert("Vui lòng chọn một đáp án!");
+            
+            if (currentQuestion < questions.length - 1) {
+                currentQuestion++;
+                showQuestion();
+            } else {
+                submitQuiz();
+            }
+        };
+
+        window.prevQuestion = () => {
+            if (currentQuestion > 0) {
+                currentQuestion--;
+                showQuestion();
+            }
+        };
+
+        async function submitQuiz() {
+            let score = 0;
+            userAnswers.forEach((ans, i) => {
+                if (ans === questions[i].correct) score++;
+            });
+
+            document.getElementById('quizView').classList.add('hidden');
+            document.getElementById('resultView').classList.remove('hidden');
+            document.getElementById('finalScore').innerText = `${score}/${questions.length}`;
+
+            if (!user) {
+                console.warn("Chưa đăng nhập, không thể lưu điểm.");
+                return;
+            }
+
+            try {
+                const resultsCol = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+                await addDoc(resultsCol, {
+                    uid: user.uid,
+                    name: userName,
+                    score: score,
+                    total: questions.length,
+                    timestamp: new Date().getTime()
+                });
+                loadLeaderboard();
+            } catch (e) {
+                console.error("Lỗi khi lưu điểm: ", e);
             }
         }
 
-        // Hiển thị danh sách
-        function renderTasks() {
-            taskList.innerHTML = '';
-            
-            if (tasks.length === 0) {
-                emptyState.classList.remove('hidden');
-                taskCount.innerText = `0 công việc`;
-            } else {
-                emptyState.classList.add('hidden');
-                taskCount.innerText = `${tasks.length} công việc`;
-
-                tasks.forEach(task => {
-                    const div = document.createElement('div');
-                    div.className = `todo-item bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-4 transition-all ${task.completed ? 'opacity-60' : ''}`;
-                    
-                    div.innerHTML = `
-                        <button onclick="toggleTask(${task.id})" class="text-xl ${task.completed ? 'text-green-500' : 'text-slate-300 hover:text-blue-500'}">
-                            <i class="${task.completed ? 'fas fa-check-circle' : 'far fa-circle'}"></i>
-                        </button>
-                        <div class="flex-1">
-                            <p class="text-slate-800 font-medium ${task.completed ? 'line-through' : ''}">${task.text}</p>
-                            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">${task.createdAt}</span>
-                        </div>
-                        <button onclick="deleteTask(${task.id})" class="text-slate-300 hover:text-red-500 transition-colors p-2">
-                            <i class="far fa-trash-alt"></i>
-                        </button>
+        async function loadLeaderboard() {
+            if (!user) return;
+            try {
+                const resultsCol = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+                const querySnapshot = await getDocs(resultsCol);
+                let allScores = [];
+                querySnapshot.forEach((doc) => allScores.push(doc.data()));
+                
+                allScores.sort((a, b) => b.score - a.score || b.timestamp - a.timestamp);
+                
+                const tbody = document.getElementById('leaderboardBody');
+                tbody.innerHTML = '';
+                
+                allScores.slice(0, 5).forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    row.className = "border-t border-slate-50";
+                    row.innerHTML = `
+                        <td class="px-6 py-4 font-bold text-indigo-600">#${index + 1}</td>
+                        <td class="px-6 py-4 font-semibold text-slate-800">${item.name}</td>
+                        <td class="px-6 py-4 text-right font-black text-slate-900">${item.score}/${item.total}</td>
                     `;
-                    taskList.appendChild(div);
+                    tbody.appendChild(row);
                 });
+            } catch (e) {
+                console.error("Lỗi tải bảng xếp hạng:", e);
             }
         }
     </script>
